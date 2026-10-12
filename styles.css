@@ -1,0 +1,101 @@
+:root {
+  color-scheme: dark;
+  --ink: #f8f5ee;
+  --muted: #bfb8d5;
+  --accent: #f1d17d;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+html { min-width: 320px; background: #0b0925; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 50% 112%, #47219e 0, #21134e 32%, transparent 69%),
+    #0b0925;
+  min-height: 100svh;
+}
+/* Keep the original poster visible, cropped toward the dance scene. */
+body { isolation: isolate; background: #0b0925; }
+body::before, body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  background-image: url("assets/lala-world-poster.png");
+  /* A minimum height ratio also keeps the poster's printed title offscreen. */
+  background-size: max(100vw, 1100px, 116vh) auto;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+body::after {
+  background:
+    linear-gradient(180deg, rgb(8 6 28 / 85%) 0%, rgb(8 6 28 / 46%) 46%, rgb(8 6 28 / 20%) 100%),
+    linear-gradient(90deg, rgb(9 7 30 / 15%) 0%, rgb(9 7 30 / 68%) 27%, rgb(9 7 30 / 86%) 50%, rgb(9 7 30 / 68%) 73%, rgb(9 7 30 / 15%) 100%);
+}
+.page { position: relative; width: min(100% - 64px, 1120px); margin: auto; padding: 66px 0 32px; text-align: center; }
+.paper-title { margin: 0; font-weight: 500; }
+.wordmark { display: block; font: 400 clamp(64px, 7.5vw, 104px)/1.18 "Bodoni 72", Didot, "Bodoni MT", Georgia, serif; letter-spacing: -.045em; }
+.title-colon { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.title-description { display: block; margin-top: 16px; font-size: clamp(26px, 3vw, 36px); line-height: 1.36; letter-spacing: -.035em; }
+.credits { margin-top: 38px; }
+.authors { max-width: 910px; margin-inline: auto; }
+.author-row { display: grid; gap: 12px; align-items: start; }
+.author-row-first { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.author-row-last { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 66%; margin: 13px auto 0; }
+.author { font-size: 17px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline; line-height: 0; margin-left: 2px; color: var(--accent); }
+.affiliations { margin: 23px auto 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.affiliations p { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin: 0; }
+.affiliations sup, .author-notes sup { margin-left: 0; margin-right: 5px; }
+.author-notes { display: flex; justify-content: center; gap: 22px; color: var(--muted); font-size: 11px; margin: 13px 0 0; }
+.summary { width: min(100%, 770px); margin: 42px auto 0; padding-top: 24px; border-top: 1px solid #b5a5d043; }
+.summary h2 { color: var(--accent); font-size: 11px; letter-spacing: .23em; font-weight: 600; margin: 0 0 14px; }
+.summary p { margin: 0; color: #e1dbee; font-size: 17px; line-height: 1.85; text-wrap: pretty; }
+.summary strong { color: #fff9eb; font-weight: 600; }
+.page-footer { display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--muted); margin-top: 38px; font-size: 11px; letter-spacing: .03em; }
+.status-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+::selection { background: #f1d17d; color: #21134e; }
+@media (min-width: 1400px) and (min-height: 900px) { .page { padding-top: 84px; } .credits { margin-top: 44px; } .summary { margin-top: 52px; } .page-footer { margin-top: 48px; } }
+@media (max-width: 800px) {
+  .page { width: calc(100% - 40px); padding-top: 52px; }
+  .author { font-size: 14px; }
+  .author-row { gap: 7px; }
+  .author-row-last { width: 69%; }
+  .affiliations { font-size: 13px; }
+  .summary { max-width: 650px; }
+}
+@media (max-width: 580px) {
+  .page { width: calc(100% - 28px); padding: 39px 0 27px; }
+  .wordmark { font-size: clamp(53px, 13.6vw, 76px); }
+  .title-description { font-size: clamp(21px, 5.4vw, 29px); margin-top: 13px; line-height: 1.42; }
+  .credits { margin-top: 31px; }
+  .author { white-space: normal; font-size: clamp(10.5px, 3vw, 14px); line-height: 1.55; }
+  .family-name { display: block; white-space: nowrap; }
+  .author-row { gap: 4px; }
+  .author-row-last { width: 69%; margin-top: 16px; }
+  .affiliations { margin-top: 23px; font-size: 11px; }
+  .affiliations p { gap: 0 14px; }
+  .author-notes { font-size: 10px; gap: 16px; margin-top: 12px; }
+  .summary { margin-top: 32px; padding: 23px 5px 0; }
+  .summary p { font-size: 15px; line-height: 1.85; }
+  .page-footer { margin-top: 30px; font-size: 10px; }
+}
+@media (max-width: 350px) { .affiliations p { gap: 0 9px; font-size: 10px; } .title-description { font-size: 19px; } }
+
+/* A quiet text field over the scene, without covering the poster with a card. */
+.paper-header { text-shadow: 0 2px 18px rgb(4 3 18 / 35%); }
+.summary { border-color: rgb(235 223 255 / 30%); }
+.summary p { color: #f0eafa; }
+.page-footer { color: #e1d9ec; }
+@media (max-width: 580px) {
+  body::before { background-position: 28% bottom; }
+  body::after {
+    background: linear-gradient(180deg, rgb(8 6 28 / 88%) 0%, rgb(8 6 28 / 83%) 46%, rgb(8 6 28 / 64%) 74%, rgb(8 6 28 / 42%) 100%);
+  }
+}
