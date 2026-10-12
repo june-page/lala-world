@@ -54,8 +54,8 @@ sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline
 .affiliations p { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin: 0; }
 .affiliations sup, .author-notes sup { margin-left: 0; margin-right: 5px; }
 .author-notes { display: flex; justify-content: center; gap: 22px; color: var(--muted); font-size: 11px; margin: 13px 0 0; }
-.institution-brand { width: fit-content; max-width: 100%; margin: 22px auto 0; padding: 10px 16px; border: 1px solid rgb(255 255 255 / 35%); border-radius: 8px; background: #f8f7fb; }
-.institution-brand img { display: block; width: 224px; max-width: 100%; height: auto; }
+.institution-brand { width: fit-content; max-width: 100%; margin: 12px auto 0; }
+.institution-brand img { display: block; width: 112px; max-width: 100%; height: auto; filter: brightness(0) invert(1); opacity: .85; }
 .summary { width: min(100%, 770px); margin: 42px auto 0; padding-top: 24px; border-top: 1px solid #b5a5d043; }
 .summary h2 { color: var(--accent); font-size: 11px; letter-spacing: .23em; font-weight: 600; margin: 0 0 14px; }
 .summary p { margin: 0; color: #e1dbee; font-size: 17px; line-height: 1.85; text-wrap: pretty; }
@@ -84,8 +84,8 @@ sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline
   .affiliations { margin-top: 23px; font-size: 11px; }
   .affiliations p { gap: 0 14px; }
   .author-notes { font-size: 10px; gap: 16px; margin-top: 12px; }
-  .institution-brand { margin-top: 18px; padding: 8px 12px; }
-  .institution-brand img { width: 190px; }
+  .institution-brand { margin-top: 10px; }
+  .institution-brand img { width: 100px; }
   .summary { margin-top: 32px; padding: 23px 5px 0; }
   .summary p { font-size: 15px; line-height: 1.85; }
   .page-footer { margin-top: 30px; font-size: 10px; }
