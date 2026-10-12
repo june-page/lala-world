@@ -45,10 +45,14 @@ body::after {
 .title-description { display: block; margin-top: 16px; font-size: clamp(26px, 3vw, 36px); line-height: 1.36; letter-spacing: -.035em; }
 .credits { margin-top: 38px; }
 .authors { max-width: 910px; margin-inline: auto; }
-.author-row { display: grid; gap: 12px; align-items: start; }
-.author-row-first { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.author-row-last { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 66%; margin: 13px auto 0; }
-.author { font-size: 17px; font-weight: 500; line-height: 1.5; white-space: nowrap; }
+.author-row { display: grid; gap: 28px; align-items: start; justify-content: center; }
+.author-row-first { grid-template-columns: repeat(5, max-content); }
+.author-row-last { grid-template-columns: repeat(3, max-content); gap: 32px; margin: 13px auto 0; }
+.author { display: inline-block; color: var(--ink); font-size: 17px; font-weight: 500; line-height: 1.5; white-space: nowrap; text-decoration: none; transition: transform 160ms ease; }
+.author:visited { color: var(--ink); }
+.author:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; border-radius: 2px; transform: translateY(-2px); }
+@media (hover: hover) { .author:hover { transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .author { transition: none; } .author:hover, .author:focus-visible { transform: none; } }
 sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline; line-height: 0; margin-left: 2px; color: var(--accent); }
 .affiliations { margin: 23px auto 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
 .affiliations p { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin: 0; }
@@ -69,8 +73,8 @@ sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline
 @media (max-width: 800px) {
   .page { width: calc(100% - 40px); padding-top: 52px; }
   .author { font-size: 14px; }
-  .author-row { gap: 7px; }
-  .author-row-last { width: 69%; }
+  .author-row { gap: 14px; }
+  .author-row-last { gap: 16px; }
   .affiliations { font-size: 13px; }
   .summary { max-width: 650px; }
 }
@@ -81,8 +85,8 @@ sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline
   .credits { margin-top: 31px; }
   .author { white-space: normal; font-size: clamp(10.5px, 3vw, 14px); line-height: 1.55; }
   .family-name { display: block; white-space: nowrap; }
-  .author-row { gap: 4px; }
-  .author-row-last { width: 69%; margin-top: 16px; }
+  .author-row { gap: clamp(8px, 3vw, 16px); }
+  .author-row-last { margin-top: 16px; }
   .affiliations { margin-top: 23px; font-size: 11px; }
   .affiliations p { gap: 0 14px; }
   .author-notes { font-size: 10px; gap: 16px; margin-top: 12px; }
