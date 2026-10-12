@@ -66,6 +66,7 @@ sup { position: relative; top: -.2em; font-size: .62em; vertical-align: baseline
 .summary h2 { color: var(--accent); font-size: 11px; letter-spacing: .23em; font-weight: 600; margin: 0 0 14px; }
 .summary p { margin: 0; color: #e1dbee; font-size: 17px; line-height: 1.85; text-wrap: pretty; }
 .summary strong { color: #fff9eb; font-weight: 600; }
+.summary .model-name { font-size: calc(1em + 2px); white-space: nowrap; }
 .page-footer { display: flex; align-items: center; justify-content: center; gap: 9px; color: var(--muted); margin-top: 38px; font-size: 11px; letter-spacing: .03em; }
 .status-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
 ::selection { background: #f1d17d; color: #21134e; }
