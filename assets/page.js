@@ -14,7 +14,6 @@
   function $(s, el) { return (el || document).querySelector(s); }
   function $$(s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); }
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
-  function smooth(a, b, x) { var t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
   function loadScript(src) {
     return new Promise(function (res, rej) {
       var s = document.createElement('script'); s.src = src; s.async = false;
@@ -69,13 +68,13 @@
 
   /* ---------------------------------------------------------------- layout (px, in page coordinates) */
   var vh = window.innerHeight, H = vh, paperBottom = 0, heroBottom = 0, heroFit = null;
-  var X = 0, F = 0;   // a chapter's shot starts when its pin is X below its place; a model fades over F of scroll
+  var X = 0, OUT = 0;   // a chapter's shot starts when its pin is X below its place; its model leaves OUT before the next one's
   var hero = $('.hero'), paper = $('.hero .paper'), heroStage = $('.hero-stage');
   function measure() {
     vh = window.innerHeight;
     var y = window.scrollY, first = chapters[1] && chapters[1].pinEl;
     H = first ? first.offsetHeight : vh;   // a pin is one screen tall (the small viewport on phones)
-    X = 0.4 * H; F = 0.15 * H;
+    X = 0.4 * H; OUT = 0.12 * H;
     chapters.forEach(function (c, i) {
       var r = c.el.getBoundingClientRect(); c.top = r.top + y; c.h = r.height; c.lens = null;
       c.a = i ? c.top - X : -Infinity;
@@ -98,10 +97,9 @@
     return a;
   }
   function endOf(i) { return i < LAST ? chapters[i + 1].a : Infinity; }
-  function alphaAt(i, y) {   // how much of chapter i's model shows: it fades in after its shot starts, out before the next one
-    if (chapters[i].key === 'end') return 0;
-    var a = chapters[i].a, b = endOf(i);
-    return (i ? smooth(a, a + F, y) : 1) * (1 - smooth(b - F, b, y));
+  function shows(i, y) {   // the scroll asks for chapter i's model: from its shot's start until a little before the next one's
+    if (chapters[i].key === 'end') return false;
+    return (!i || y >= chapters[i].a) && y < endOf(i) - OUT;
   }
   function progress(i, y) {   // 0 → 1 while chapter i's model is on the screen
     var a = i ? chapters[i].a : 0, b = endOf(i);
@@ -150,7 +148,8 @@
   }
 
   /* ---------------------------------------------------------------- the film */
-  var film = null, current = -1, pending = -1, pendingTimer = 0, interacted = false, endTimer = 0, fadeIn = 1;
+  var film = null, current = -1, pending = -1, pendingTimer = 0, queued = -1, interacted = false, endTimer = 0;
+  var vis = 0;   // how much of the current chapter's model shows
   var stageEl = $('#stage');
 
   function viewFor(v) { return v; }   // a shot's framing for this screen (shots are composed for 16:9; the lens does the adapting)
@@ -192,8 +191,12 @@
       L.s = g.s; L.x = g.x; L.y = g.y - 2 * off(c, y) / S.h;   // the picture goes with its pin
     }
     L.snap = true;
-    fadeIn = Math.min(1, fadeIn + dt / 0.35);   // after a change of shot, whatever the scroll did meanwhile
-    film.setFade(alphaAt(current, y) * fadeIn);
+    /* the model comes and goes in its own time once the scroll asks (never left half-faded where the scroll stops); a
+       queued shot waits until the last model has gone */
+    var aim = queued < 0 && shows(current, y) ? 1 : 0;
+    vis = aim > vis ? Math.min(1, vis + dt / 0.5) : Math.max(0, vis - dt / (queued < 0 ? 0.3 : 0.12));
+    film.setFade(vis * vis * (3 - 2 * vis));
+    if (queued >= 0 && vis === 0) { var q = queued; queued = -1; start(q); }
     var shot = film.shots[film.byShot[c.key]];
     film.setYaw(reduce.matches ? 0 : (shot.yaw || 0) * progress(current, y));
     showLook(y);
@@ -201,8 +204,12 @@
 
   function play(i, instant) {
     clearTimeout(pendingTimer); pending = -1;
-    if (i === current) return;
-    current = i; fadeIn = 0;
+    if (i === current) { queued = -1; return; }
+    if (vis > 0.01 && !instant) { queued = i; film.setPaused(false); return; }   // the last model leaves first
+    start(i, instant);
+  }
+  function start(i, instant) {
+    current = i;
     var c = chapters[i], s = film.byShot[c.key];
     film.setLight(film.isNight(c.look));   // the model is lit for its own chapter's background
     film.goShot(s, { instant: !!instant || reduce.matches, cut: true });
@@ -215,7 +222,7 @@
     syncChrome();
   }
   function want(i) {   // the shot changes a moment after the scroll crosses into a chapter: a fling through five plays only the last
-    if (i === current) { clearTimeout(pendingTimer); pending = -1; return; }
+    if (i === current) { clearTimeout(pendingTimer); pending = -1; queued = -1; return; }
     if (i === pending) return;
     if (jumping >= 0 && i !== jumping) return;   // a dot was clicked: only the destination plays
     pending = i; clearTimeout(pendingTimer);
@@ -227,7 +234,7 @@
     nav.classList.toggle('on', past);
     dotsNav.classList.toggle('on', past);
     dots.forEach(function (d, j) { d.classList.toggle('on', j === a); if (j === a) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current'); });
-    hint.classList.toggle('on', !!film && !interacted && current >= 0 && current < byKey.data1.i && alphaAt(current, y) > 0.6);
+    hint.classList.toggle('on', !!film && !interacted && current >= 0 && current < byKey.data1.i && vis > 0.6);
   }
 
   var ticking = false;

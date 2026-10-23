@@ -192,6 +192,7 @@
     var studioTex = texture(studioCanvas), nightTex = texture(nightCanvas);
     function paintBackgrounds() {
       var w = Math.min(2048, Math.round(W * 1.25)), h = Math.round(w * H / W);
+      if (studioCanvas.width !== w || studioCanvas.height !== h) { studioTex.dispose(); nightTex.dispose(); }   // a new size needs new GPU storage
       studioCanvas.width = nightCanvas.width = w; studioCanvas.height = nightCanvas.height = h;
       var g = studioCanvas.getContext('2d');
       var rg2 = g.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.42, Math.hypot(w, h) * 0.62);
