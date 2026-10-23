@@ -2,56 +2,163 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b0925">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#e6e6ea">
     <title>LaLa-World: Scaling Latent World Models with Natural Language Actions</title>
-    <meta name="description" content="LaLa-World uses natural language as a shared action interface to learn a single latent world model from simulation, robotics, images, and videos, enabling efficient planning and downstream policy learning.">
+    <meta name="description" content="LaLa-World uses natural language as a shared action interface to learn a single latent world model from simulation, robotics, images, and videos, enabling efficient planning and downstream policy learning with LaLa-Policy.">
     <meta property="og:type" content="website">
     <meta property="og:title" content="LaLa-World: Scaling Latent World Models with Natural Language Actions">
-    <meta property="og:description" content="A language-conditioned latent world model for efficient planning and downstream policy learning. Full project page coming soon.">
+    <meta property="og:description" content="One latent world model, actions in natural language: learned from simulation, robotics, images, and videos, and fine-tuned into LaLa-Policy.">
     <meta property="og:url" content="https://june-page.github.io/lala-world/">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:image" content="https://june-page.github.io/lala-world/assets/og.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://june-page.github.io/lala-world/assets/og.jpg">
     <link rel="canonical" href="https://june-page.github.io/lala-world/">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%235B3B88'/%3E%3Cpath d='M20 14h6v34h20v5H20z' fill='%23FAF8F2'/%3E%3Ccircle cx='45' cy='19' r='4' fill='%23F4D068'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="styles.css?v=20261012-model-names">
+    <link rel="preload" href="assets/fonts/Inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="assets/style.css">
+    <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+    </script>
+    <script>
+      document.documentElement.classList.add('js');   // the opening copy waits to arrive like the film's captions
+      document.addEventListener('DOMContentLoaded', function () { requestAnimationFrame(function () { document.documentElement.classList.add('in'); }); });
+    </script>
+    <script src="assets/page.js" defer></script>
   </head>
   <body>
-    <main class="page">
-      <header class="paper-header">
-        <h1 class="paper-title">
-          <span class="wordmark">LaLa-World<span class="title-colon">:</span></span>
-          <span class="title-description">Scaling Latent World Models<br class="title-break"> with Natural Language Actions</span>
-        </h1>
-        <div class="credits">
+    <div class="backdrop" aria-hidden="true"></div>
+    <div class="stage" id="stage" aria-hidden="true"></div>
+    <p class="drag-hint" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 0 1 15.1-5.3"/><path d="M18.9 3.4v3.6h-3.6"/><path d="M20.5 12a8.5 8.5 0 0 1-15.1 5.3"/><path d="M5.1 20.6V17h3.6"/></svg>
+      <span class="when-mouse">Drag to rotate</span><span class="when-touch">Swipe sideways to rotate</span>
+    </p>
+
+    <nav class="localnav" aria-label="Project">
+      <a class="ln-brand" href="#top"><span class="nw">LaLa-<em>World</em></span> <span class="amp">&amp;</span> <span class="nw">LaLa-<em>Policy</em></span></a>
+      <div class="ln-links">
+        <a href="https://arxiv.org/abs/2610.27851" target="_blank" rel="noopener">arXiv</a>
+        <a class="ln-more" href="https://www.alphaxiv.org/abs/2610.27851" target="_blank" rel="noopener">alphaXiv</a>
+        <a class="ln-more" href="https://huggingface.co/papers/2610.27851" target="_blank" rel="noopener">HF</a>
+        <a href="https://github.com/junha1125/LaLa-World" target="_blank" rel="noopener">Code</a>
+        <a class="ln-more" href="https://june-page.github.io/lala-world-slides/" target="_blank" rel="noopener">Slides</a>
+      </div>
+    </nav>
+    <nav class="chapters" aria-label="Chapters"></nav>
+
+    <main>
+      <header class="hero" id="top" data-shot="start">
+        <p class="hero-wm" aria-hidden="true"><span class="nw">LaLa-<em>World</em></span> <span class="amp">&amp;</span> <span class="nw">LaLa-<em>Policy</em></span></p>
+        <div class="hero-stage"><span class="loader" aria-hidden="true"><i></i><i></i><i></i></span></div>
+        <div class="paper">
+          <h1 class="paper-title">LaLa-World: Scaling Latent World Models with Natural&nbsp;Language&nbsp;Actions</h1>
           <div class="authors" role="group" aria-label="Authors">
-            <div class="author-row author-row-first">
-              <a class="author" href="https://www.junha.page/p/about.html" target="_blank" rel="noopener noreferrer">Junha <span class="family-name">Song<sup>1*</sup></span></a>
-              <a class="author" href="https://geonm.github.io/" target="_blank" rel="noopener noreferrer">Geonmo <span class="family-name">Gu<sup>1</sup></span></a>
-              <a class="author" href="https://jeongeun-park-page.github.io/" target="_blank" rel="noopener noreferrer">Jeongeun <span class="family-name">Park<sup>2</sup></span></a>
-              <a class="author" href="https://hazel-heejeong-nam.github.io/" target="_blank" rel="noopener noreferrer">Heejeong <span class="family-name">Nam<sup>3</sup></span></a>
-              <a class="author" href="https://lucasmaes.me/" target="_blank" rel="noopener noreferrer">Lucas <span class="family-name">Maes<sup>4</sup></span></a>
-            </div>
-            <div class="author-row author-row-last">
-              <a class="author" href="https://sites.google.com/view/byeongho-heo/home" target="_blank" rel="noopener noreferrer">Byeongho <span class="family-name">Heo<sup>1</sup></span></a>
-              <a class="author" href="https://sites.google.com/site/dyhan0920/" target="_blank" rel="noopener noreferrer">Dongyoon <span class="family-name">Han<sup>1</sup></span></a>
-              <a class="author" href="https://sangdooyun.github.io/" target="_blank" rel="noopener noreferrer">Sangdoo <span class="family-name">Yun<sup>1†</sup></span></a>
-            </div>
+            <span class="author-row">
+              <a href="https://www.junha.page/p/about.html" target="_blank" rel="noopener">Junha Song<sup>1*</sup></a>
+              <a href="https://geonm.github.io/" target="_blank" rel="noopener">Geonmo Gu<sup>1</sup></a>
+              <a href="https://jeongeun-park-page.github.io/" target="_blank" rel="noopener">Jeongeun Park<sup>2</sup></a>
+              <a href="https://hazel-heejeong-nam.github.io/" target="_blank" rel="noopener">Heejeong Nam<sup>3</sup></a>
+              <a href="https://lucasmaes.me/" target="_blank" rel="noopener">Lucas Maes<sup>4</sup></a>
+            </span>
+            <span class="author-row">
+              <a href="https://sites.google.com/view/byeongho-heo/home" target="_blank" rel="noopener">Byeongho Heo<sup>1</sup></a>
+              <a href="https://sites.google.com/site/dyhan0920/" target="_blank" rel="noopener">Dongyoon Han<sup>1</sup></a>
+              <a href="https://sangdooyun.github.io/" target="_blank" rel="noopener">Sangdoo Yun<sup>1†</sup></a>
+            </span>
           </div>
-          <div class="affiliations" role="group" aria-label="Affiliations">
-            <p><span><sup>1</sup>NAVER AI Lab</span><span><sup>2</sup>Georgia Institute of Technology</span></p>
-            <p><span><sup>3</sup>Brown University</span><span><sup>4</sup>Mila &amp; Université de Montréal</span></p>
+          <p class="affils"><span><sup>1</sup>NAVER AI Lab</span> <span><sup>2</sup>Georgia Institute of Technology</span> <span><sup>3</sup>Brown University</span> <span><sup>4</sup>Mila &amp; Université de Montréal</span></p>
+          <div class="brandline">
+            <img class="lab-logo" src="assets/naver-ai-lab.png" alt="NAVER AI Lab" width="1270" height="196">
+            <p class="notes"><span><sup>*</sup>Project Lead</span> <span><sup>†</sup>Corresponding Author</span></p>
           </div>
-          <div class="institution-brand">
-            <img src="assets/ai_lab_logo_horizontal.png" alt="NAVER AI Lab" width="224" height="35">
+          <div class="links">
+            <a class="btn" href="https://arxiv.org/abs/2610.27851" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>arXiv</a>
+            <a class="btn" href="https://www.alphaxiv.org/abs/2610.27851" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-10.9 6.7L4 19.5l1.4-4.4A7.5 7.5 0 1 1 20 11.5z"/><path d="M9 10.5h6M9 13.5h4"/></svg>alphaXiv</a>
+            <a class="btn" href="https://huggingface.co/papers/2610.27851" target="_blank" rel="noopener"><span class="emoji" aria-hidden="true">🤗</span>HF</a>
+            <a class="btn" href="https://github.com/junha1125/LaLa-World" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>Code</a>
+            <a class="btn" href="https://june-page.github.io/lala-world-slides/" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M10.5 8.2v3.6l3.1-1.8z"/></svg>Slides</a>
           </div>
-          <p class="author-notes"><span><sup>*</sup>Project Lead</span><span><sup>†</sup>Corresponding Author</span></p>
         </div>
       </header>
-      <section class="summary" aria-labelledby="tldr-heading">
-        <h2 id="tldr-heading">TL;DR</h2>
-        <p>A <strong>La</strong>nguage-conditioned <strong>La</strong>tent <strong>World</strong> model (<strong class="model-name">LaLa-World</strong>) uses natural language as a shared action interface to learn from simulation, robotics, images, and videos. It predicts future visual representations for efficient planning across domains and can be fine-tuned into <strong class="model-name">LaLa-Policy</strong>, which jointly predicts robot actions and future representations.</p>
+
+      <!-- One chapter per shot of the film. A chapter's .pin holds the screen while the section scrolls past (data-pin:
+           for how long, in vh): its title rises from below with the page, its shot plays, then both scroll away. -->
+      <section class="chapter dark" id="lala-world" data-shot="world" data-pin="50" aria-labelledby="h-world">
+        <div class="pin">
+          <h2 class="cap wm" id="h-world">LaLa-<em>World</em><small>Language-conditioned Latent World Model</small></h2>
+        </div>
       </section>
-      <footer class="page-footer"><span class="status-dot" aria-hidden="true"></span>Full project page coming soon.</footer>
+      <section class="chapter" id="latent" data-shot="latent" data-pin="70" aria-labelledby="h-latent">
+        <div class="pin">
+          <h2 class="cap" id="h-latent">Predicts <em>the future</em>.<br><span class="mute">In latent space.</span></h2>
+          <div class="row ctl" data-for="latent" role="group" aria-label="Show a domain"></div>
+        </div>
+      </section>
+      <section class="chapter" id="actions" data-shot="words" data-pin="80" aria-labelledby="h-words">
+        <div class="pin">
+          <h2 class="cap" id="h-words">Every action, <em>in words</em>.</h2>
+        </div>
+      </section>
+      <section class="chapter" id="one-model" data-shot="legacy" data-pin="90" aria-labelledby="h-legacy">
+        <div class="pin">
+          <h2 class="cap" id="h-legacy">No more <em>domain-specific</em> models.</h2>
+        </div>
+      </section>
+      <section class="chapter" id="domains" data-shot="data1" data-pin="50" aria-labelledby="h-data1">
+        <div class="pin">
+          <h2 class="cap" id="h-data1">One world model. <em class="nw">Every domain.</em></h2>
+        </div>
+      </section>
+      <section class="chapter" id="video" data-shot="data2" data-pin="60" aria-labelledby="h-data2">
+        <div class="pin">
+          <h2 class="cap" id="h-data2">Learns from <em>video</em>, too.</h2>
+        </div>
+      </section>
+      <section class="chapter dark" id="evolve" data-shot="evolve" data-pin="100" aria-labelledby="h-evolve">
+        <div class="pin">
+          <h2 class="cap" id="h-evolve">Evolves into <em>LaLa-Policy</em>.</h2>
+        </div>
+      </section>
+      <section class="chapter dark" id="lala-policy" data-shot="policy" data-pin="70" aria-labelledby="h-policy">
+        <div class="pin">
+          <h2 class="cap wm" id="h-policy">LaLa-<em>Policy</em><small>Acts — and anticipates.</small></h2>
+          <div class="row ctl" data-for="policy" role="group" aria-label="Show a model">
+            <button type="button" data-model="world">LaLa-World</button>
+            <button type="button" data-model="policy">LaLa-Policy</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="credits dark" id="tldr" data-shot="end" aria-labelledby="h-tldr">
+        <div class="credits-in">
+          <h2 class="eyebrow" id="h-tldr">TL;DR</h2>
+          <p class="tldr">A <strong>La</strong>nguage-conditioned <strong>La</strong>tent <strong>World</strong> model (<strong class="nm">LaLa-World</strong>) uses natural language as a shared action interface to learn from simulation, robotics, images, and videos. It predicts future visual representations for efficient planning across domains and can be fine-tuned into <strong class="nm">LaLa-Policy</strong>, which jointly predicts robot actions and future representations.</p>
+          <div class="links" data-clone="links"></div>
+          <div class="bibtex" id="bibtex">
+            <div class="bib-head"><h2 class="eyebrow">BibTeX</h2><button type="button" class="copy-btn">Copy</button></div>
+            <pre><code>@article{song2026lalaworld,
+  title   = {LaLa-World: Scaling Latent World Models with Natural Language Actions},
+  author  = {Song, Junha and Gu, Geonmo and Park, Jeongeun and Nam, Heejeong and
+             Maes, Lucas and Heo, Byeongho and Han, Dongyoon and Yun, Sangdoo},
+  journal = {arXiv preprint arXiv:2610.27851},
+  year    = {2026}
+}</code></pre>
+          </div>
+          <footer class="page-foot">
+            <span class="lab-mark"><img src="assets/naver-ai-lab.png" alt="NAVER AI Lab" width="1270" height="196"></span>
+            <a href="#top" class="to-top">Back to top</a>
+          </footer>
+        </div>
+      </section>
     </main>
   </body>
 </html>
