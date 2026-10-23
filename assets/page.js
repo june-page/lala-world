@@ -197,6 +197,7 @@
     vis = aim > vis ? Math.min(1, vis + dt / 0.5) : Math.max(0, vis - dt / (queued < 0 ? 0.3 : 0.12));
     film.setFade(vis * vis * (3 - 2 * vis));
     if (queued >= 0 && vis === 0) { var q = queued; queued = -1; start(q); }
+    syncHint();
     var shot = film.shots[film.byShot[c.key]];
     film.setYaw(reduce.matches ? 0 : (shot.yaw || 0) * progress(current, y));
     showLook(y);
@@ -234,7 +235,11 @@
     nav.classList.toggle('on', past);
     dotsNav.classList.toggle('on', past);
     dots.forEach(function (d, j) { d.classList.toggle('on', j === a); if (j === a) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current'); });
-    hint.classList.toggle('on', !!film && !interacted && current >= 0 && current < byKey.data1.i && vis > 0.6);
+  }
+  var hintOn = false;
+  function syncHint() {   // "drag to rotate", while one of the first models is on the screen and nobody has dragged yet
+    var on = !!film && !interacted && current >= 0 && current < byKey.data1.i && vis > 0.6;
+    if (on !== hintOn) { hintOn = on; hint.classList.toggle('on', on); }
   }
 
   var ticking = false;
@@ -252,7 +257,13 @@
     });
   }
   window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', function () { measure(); onScroll(); });
+  window.addEventListener('resize', function () {   // a new layout keeps the visitor's place: the same chapter, as far into it
+    var y = window.scrollY, i = activeAt(y), top0 = i ? chapters[i].top : 0, f = (y - top0) / H, H0 = H;
+    measure();
+    var top1 = i ? chapters[i].top : 0;
+    if (Math.abs(top1 - top0) > 1 || Math.abs(H - H0) > 1) window.scrollTo(0, Math.max(0, top1 + f * H));   // not for a phone's toolbar
+    onScroll();
+  });
   window.addEventListener('load', function () { measure(); onScroll(); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { measure(); onScroll(); });
   measure();
@@ -300,7 +311,7 @@
     return window.LalaFilm.boot({
       host: stageEl, labelHost: document.body, view: viewFor, onFrame: function (dt) { if (film && current >= 0) onFrame(dt); },
       onDomain: function (i) { onDomain(i); },
-      onInteract: function () { interacted = true; syncChrome(); },
+      onInteract: function () { interacted = true; syncHint(); },
       onFirstFrames: function () { stageEl.classList.add('on'); root.classList.add('ready'); }
     });
   }).then(function (api) {
