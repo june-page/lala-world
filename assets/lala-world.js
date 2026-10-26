@@ -1,4 +1,4 @@
-/* LaLa-World project page — the glass stack (from the LaLa 3D film, claude-3d-model_v6/assets/lala-world.js).
+/* LaLa-World project page — the glass stack (from the LaLa 3D film, claude-3d-model_v14/assets/lala-world.js).
    Classic script (dynamic import of three.js) so the page also works from file://. Nothing runs until the page calls
    LalaFilm.boot(options); it resolves to the API page.js drives while the visitor scrolls (see the end of main()).
 
@@ -18,13 +18,26 @@
    Backgrounds: a = the LaLa-World poster, b = white with the faintest violet (the poster as a blurred veil),
    c = the night of the talk's section slides.
 
+   The opening, under the title "LaLa-World & LaLa-Policy" while the camera closes in slowly: LaLa-World builds up in
+   the middle and the data of "Learns from video, too." comes in around it, its traces orange / violet into the model;
+   then LaLa-Policy's action generator buds off beside the future observation (no simulator yet) and the robot
+   demonstrations it learns from (LIBERO, RoboCasa: assets/robot.js) come in to the right of the two rows of video, their
+   traces green / teal into the generator. As the visitor scrolls on toward LaLa-World, the poster comes out of b behind
+   the page and goes back into it (passLook: the film's move from 0 to 1).
+
+   The results (assets/lala-charts.js) are four chart chapters, P1–P3 after "Video, too" and P4 after LaLa-Policy: the
+   camera looks up past the stage (an empty studio) and the chart stands in the chapter. LaLa-Policy keeps the night sky,
+   c: Evolve, LaLa-Policy and P4 (its chart in night colours).
+
    Shots = the page's chapters: Start · LaLa-World · Latent future · Actions in words · No domain-specific models ·
-   Every domain · Video, too · Evolve · LaLa-Policy, and End (the model bows out under the closing credits). */
+   Every domain · Video, too · P1 · P2 · P3 · Evolve · LaLa-Policy · P4, and End (LaLa-Policy bows out under the closing
+   credits; the film's own end is not on the page). The motions keep the film's v14 pace: the opening (the model builds
+   1.8× faster than in v13), the merge, Evolve (the ring, then LaLa-Policy) and the charts (TEMPO in lala-charts.js). */
 (function () {
   'use strict';
   var booted = null;
   window.LalaFilm = {
-    /* opts: { host, labelHost, view(shot, i), onInteract(), onFirstFrames(), onFrame(dt), onDomain(i), fitCap } */
+    /* opts: { host, labelHost, view(shot, i), onInteract(), onFirstFrames(), onFrame(dt), fitCap } */
     boot: function (opts) {
       if (!booted) booted = Promise.all([import('three'), import('three/addons/controls/OrbitControls.js'), import('three/addons/postprocessing/EffectComposer.js'),
         import('three/addons/postprocessing/RenderPass.js'), import('three/addons/postprocessing/UnrealBloomPass.js'),
@@ -39,27 +52,58 @@
   async function main(THREE, L, opts) {
     var MEDIA = window.LALA_MEDIA;
 
-    /* the three backgrounds */
-    var LOOK = {   // the poster 1.3× smaller than a cover fit: its blurred edges run out into the night sky at the sides
-      paper: { night: 0, glow: 0, amt: 1, lift: 0.84, band: 0, blur: 1, sat: 1.3, zoom: 1, panU: 0.5, panV: 0, top: 0 },          // b
-      poster: { night: 1, glow: 1, amt: 0.95, lift: 0, band: 0, blur: 0, sat: 1, zoom: 1 / 1.3, panU: 0.5, panV: 0, top: 0.45 },        // a, sharp
-      posterSoft: { night: 1, glow: 1, amt: 0.62, lift: 0, band: 0, blur: 0.9, sat: 1, zoom: 1 / 1.3, panU: 0.5, panV: 0, top: 0.55 },  // a, behind the model
-      sky: { night: 1, glow: 1, amt: 0, lift: 0.84, band: 0, blur: 1, sat: 1.3, zoom: 1, panU: 0.5, panV: 0, top: 0 }            // c (poster settings as b, at zero opacity: b ↔ c never shows it)
+    /* the backgrounds (stage.bg). a is framed as on a 16:9 screen at 1/1.3 of a cover fit (the people about a fifth of the
+       screen height), running on past its sides, and lighter toward the top so the caption stays on a light ground. It comes
+       out of b and goes back into it by its lift and blur (a dark picture faded against white would turn grey on the way) */
+    var POSTER = { zoom: 1 / 1.3, panU: 0.5, panV: 0.04, cropL: 0.1, sides: 1, bandLo: 0.5, bandHi: 0.95 };
+    var LOOK = {
+      paper: { night: 0, glow: 0, veil: 1, amt: 0, lift: 0.84, bright: 0, blur: 1, sat: 1.3, cool: 0, band: 0, top: 0 },   // b (and a, after its pass, back into b)
+      sky: { night: 1, glow: 1, veil: 0, amt: 0, top: 0 },                                                                  // c
+      inVeil: Object.assign({ amt: 1, lift: 0.84, bright: 0, blur: 1, sat: 1.3, cool: 0, band: 0 }, POSTER),                 // a as faint and soft as b: where it starts and ends
+      pass: { lift: 0.06, bright: 0.5, blur: 0.06, sat: 1.05, cool: 0, band: 1 },                                           // at its clearest (halfway through its pass)
+      chart: { night: 0, glow: 0, veil: 0.45, amt: 0, top: 0 }                                                              // b, fainter: nothing of the poster behind a chart
     };
-    LOOK.posterCover = Object.assign({}, LOOK.poster, { zoom: 1 });   // a, as it first comes up behind the opening screen
-    /* The page owns the background: each chapter's look comes up the screen with its section (look() and split() in the API
-       below). LaLa-World's own look moves while its shot plays: the poster is pulled back from a cover fit, then falls out
-       of focus. */
-    var WL = { pull: 1, soft: 1 };
-    var LOOK_KEYS = Object.keys(LOOK.paper);
-    function mixRaw(P, Q, k) { var o = {}; LOOK_KEYS.forEach(function (key) { o[key] = P[key] + (Q[key] - P[key]) * k; }); return o; }
+    /* a's pass (the film's move from 0 to 1): it comes out of b, clearest halfway, drifting across, and goes back into b.
+       The page runs it with the scroll, between the opening and LaLa-World: passLook(u), u from 0 to 1 */
+    var PASS = Object.assign({}, LOOK.paper, LOOK.inVeil);
+    function passLook(u) {
+      var c = smooth(0.08, 0.46, u) * (1 - smooth(0.6, 0.97, u));   // how clear it is
+      PASS.amt = smooth(0, 0.1, u) * (1 - smooth(0.95, 1, u));   // a and b look alike at both ends
+      ['lift', 'bright', 'blur', 'sat', 'band'].forEach(function (key) { PASS[key] = lerp(LOOK.inVeil[key], LOOK.pass[key], c); });
+      var mid = Math.sin(Math.PI * c); PASS.bright += 1.1 * mid; PASS.sat += 0.35 * mid; PASS.cool = mid;   // half-clear: lighter shadows, more colour, no grey
+      PASS.panU = lerp(0.42, 0.58, ease.inOutSine(u));
+      return PASS;
+    }
+
     /* ---------------------------------------------------------------- shots (the captions live in the page's markup)
        yaw: degrees the camera turns about the model while the visitor scrolls through the chapter (the film's drift)
-       box: what a narrow screen must show of the shot (world space, [x0, y0, z0, x1, y1, z1]); the page fits it with the lens */
+       box: what a narrow screen must show of the shot (world space, [x0, y0, z0, x1, y1, z1]); the page fits it with the lens
+       limit: [azimuth, polar] radians either side of the shot's view a drag may turn it ([0, 0]: not at all) */
+    /* the opening (see the top). The camera closes in from `from` to the shot's view while the model builds up.
+       rot: the arc of the data turned about the model (degrees, counted like the cards' angles: < 0 to the left);
+       build: the model's build-up (1.8× v13's 1.4 s); wait: when the model's screens start;
+       at / run: when the data, the action generator and the robot demonstrations begin to come in, and for how long (s).
+       cards: the robot demonstrations (assets/robot.js, by key) where each stands on the arc (angle from straight behind
+       the model, clockwise seen from above; radius; the height of its foot; width), facing the model like the others:
+       to the right of the two rows of video, LIBERO with the upper row, RoboCasa with the lower.
+       box: the whole arc, for the opening screen's band; compact: a narrow screen's (the model and the cards nearest it) */
+    var OPEN = {
+      view: { pos: [-1.25, 6.46, 8.93], target: [0.58, 2.2, -4.16], fov: 38 }, from: { pos: [-0.6, 7.2, 11.6], target: [0.3, 2.3, -4.2], fov: 38 },
+      rot: -10, build: 0.78, wait: 0.75, at: { data: 0.9, gen: 2.0, robot: 2.3 }, run: { data: 1.6, gen: 0.9, robot: 1.1 }, dur: 4.2,
+      cards: [{ ep: 'libero-moka', angle: 50, radius: 7.55, y: 2.55, width: 1.95 }, { ep: 'libero-soup', angle: 68, radius: 7.55, y: 2.55, width: 1.95 },
+        { ep: 'robocasa-mug', angle: 54, radius: 6.25, y: 0.95, width: 1.9 }, { ep: 'robocasa-door', angle: 74, radius: 6.25, y: 0.95, width: 1.9 }],
+      box: [-6.9, 0, -7.6, 8.0, 4.1, 0.95], compact: [-3.3, 0, -4.8, 4.4, 3.4, 0.95] };
+    var OPEN_AT = OPEN.at;
+    var SKY = { pos: [0, 6.6, 8.6], target: [0, 12.8, -6], fov: 34 };   // the charts: looking up past the stage, an empty studio
+    function chartDef(name, label, first) {   // the first chart of a run builds `chartAt` s in; the next ones turn out of it
+      var night = name === 'p4';   // LaLa-Policy's chart stays on the night sky
+      return { key: name, label: label, bg: night ? 'night' : 'studio', look: night ? LOOK.sky : LOOK.chart, pos: SKY.pos, target: SKY.target, fov: SKY.fov,
+        chartAt: first ? 0.6 : 0, yaw: 0, limit: [0, 0], apply: function (ctx) { return chartShot(name, ctx); } };
+    }
     var SHOTS = [
-      { key: 'start', box: [-6.0, 0, -0.9, 5.1, 2.95, 0.9], label: 'Start', bg: 'studio', look: LOOK.paper, bgDur: 1.2, pos: [0.1, 5.35, 12.9], target: [0.1, 1.7, 0], fov: 30, dur: 1.2, captionAt: 0.3, yaw: 0, limit: [0.55, 0.28],
-        apply: function (c) { return startShot(c); } },
-      { key: 'world', box: [-3.55, 0, -0.9, 0.95, 2.9, 0.9], label: 'LaLa-World', bg: 'night', look: LOOK.poster, bgDur: 0.9, pos: [-0.7, 5.0, 10.6], target: [-0.6, 1.55, 0], fov: 26, dur: 1.6, captionAt: 1.0, yaw: 12,
+      { key: 'start', box: OPEN.box, label: 'Start', bg: 'studio', look: LOOK.paper, pos: OPEN.view.pos, target: OPEN.view.target, fov: OPEN.view.fov, yaw: 0, limit: [0.55, 0.28],
+        apply: function (c) { return openWall(c); } },
+      { key: 'world', box: [-3.55, 0, -0.9, 0.95, 2.9, 0.9], label: 'LaLa-World', bg: 'studio', look: LOOK.paper, pos: [-0.7, 5.0, 10.6], target: [-0.6, 1.55, 0], fov: 26, yaw: 12,
         apply: function (c) { return heroShot(c); } },
       { key: 'latent', box: [-3.6, -0.05, -0.9, 3.4, 3.5, 0.9], label: 'Latent future', bg: 'studio', look: LOOK.paper, bgDur: 1.5, pos: [5.4, 7.3, 9.6], target: [-0.55, 2.15, 0], fov: 31, yaw: -12,
         apply: function (c) { return setScene('latent', c); } },
@@ -71,23 +115,27 @@
         apply: function (c) { return setScene('data1', c); } },
       { key: 'data2', box: [-3.6, 0, -7.6, 3.6, 4.5, 1.0], label: 'Video, too', bg: 'studio', look: LOOK.paper, pos: [0, 6.2, 7.0], target: [0, 2.5, -4.6], fov: 38, yaw: -8,
         apply: function (c) { return setScene('data2', c); } },
-      { key: 'evolve', box: [-3.6, 0, -1.7, 3.9, 3.1, 1.7], label: 'Evolve', bg: 'night', look: LOOK.sky, bgDur: 2.0, pos: [0, 6.9, 9.4], target: [0, 1.9, -3.2], fov: 40, dur: 2.0, captionAt: 3.5, yaw: 0,
+      chartDef('p1', 'vs. world models', true), chartDef('p2', 'Planning time'), chartDef('p3', 'Training cost'),
+      { key: 'evolve', box: [-3.6, 0, -1.7, 3.9, 3.1, 1.7], label: 'Evolve', bg: 'night', look: LOOK.sky, pos: [0, 6.9, 9.4], target: [0, 1.9, -3.2], fov: 40, yaw: 0,
         apply: function (c) { return evolve(c); } },
       { key: 'policy', box: [-3.5, 0, -0.9, 3.9, 3.05, 0.9], label: 'LaLa-Policy', bg: 'night', look: LOOK.sky, pos: [0.45, 5.3, 10.8], target: [0.42, 1.5, 0], fov: 31, yaw: -8,
         apply: function (c) { return setScene('policy', c); } },
-      { key: 'end', box: [-3.5, 0, -0.9, 3.9, 3.05, 0.9], label: 'End', bg: 'night', look: LOOK.sky, pos: [0.45, 5.8, 12.2], target: [0.42, 1.5, 0], fov: 31, dur: 1.4, captionAt: 0, yaw: 0,
+      chartDef('p4', 'vs. other policies', true),
+      { key: 'end', box: [-3.5, 0, -0.9, 3.9, 3.05, 0.9], label: 'End', bg: 'night', look: LOOK.sky, pos: [0.45, 5.8, 12.2], target: [0.42, 1.5, 0], fov: 31, yaw: 0,
         apply: function (c) { return endShot(c); } }
     ];
 
     var stage = LalaStage.create({ THREE: THREE, OrbitControls: L.OrbitControls, EffectComposer: L.EffectComposer, RenderPass: L.RenderPass,
       UnrealBloomPass: L.UnrealBloomPass, OutputPass: L.OutputPass, ShaderPass: L.ShaderPass }, {
       host: opts.host, labelHost: opts.labelHost, shots: SHOTS, bg: 'studio', fitCap: opts.fitCap, pageBg: true,
-      camera: { pos: SHOTS[0].pos, target: SHOTS[0].target, fov: SHOTS[0].fov },
-      view: opts.view, onInteract: opts.onInteract, onFirstFrames: opts.onFirstFrames, onFrame: opts.onFrame
+      camera: { pos: OPEN.from.pos, target: OPEN.from.target, fov: OPEN.from.fov },
+      view: opts.view, onInteract: opts.onInteract, onFirstFrames: opts.onFirstFrames,
+      onFrame: function (dt) { if (opts.onFrame) opts.onFrame(dt); if (charts) charts.draw(); }   // a chart goes with its pin in the same frame
     });
     var scene = stage.scene, anim = stage.anim, ease = stage.ease, COL = stage.colors, tex = stage.tex;
     var smooth = stage.smooth, clamp01 = stage.clamp01, lerp = stage.lerp, hash = stage.hash;
     await stage.fontsReady;   // canvas textures below need the fonts
+    var charts = LalaCharts.create(stage, { host: opts.labelHost });
 
     /* ---------------------------------------------------------------- images */
     var img = {};
@@ -96,15 +144,15 @@
     var jobs = [load('poster', MEDIA.poster.src), load('posterBlur', MEDIA.poster.blur), load('nightSky', MEDIA.nightSky)];
     DOMAINS.concat([WVID]).forEach(function (d) { d.frames.forEach(function (f, i) { jobs.push(load(d.key + ':' + i, f)); }); });
     MEDIA.omniedit.forEach(function (s) { jobs.push(load('oe:' + s.key + ':cur', s.cur), load('oe:' + s.key + ':fut', s.fut)); });
-    MEDIA.policy.forEach(function (p) { jobs.push(load('sim:' + p.key, p.sim.src), load('imag:' + p.key, p.imag.src)); });   // OpenVid: addVideo(), later
+    MEDIA.policy.forEach(function (p) { jobs.push(load('sim:' + p.key, p.sim.src), load('imag:' + p.key, p.imag.src)); });   // OpenVid, robots: addVideo(), addRobots()
     MEDIA.rows.forEach(function (r) { jobs.push(load('row:' + r.key, r.thumb)); });
     await Promise.all(jobs);
     stage.bg.setPoster(img.poster, img.posterBlur);
     stage.bg.setNightSky(img.nightSky);
 
     /* ---------------------------------------------------------------- scene state (the models keep their own) */
-    var T = { data: 0, rows: 0 };                                                        // targets
-    var V = { data: 0, rows: 0, morph: 0, wires: 0, legacy: 0, legacyIn: 1, merge: 1, train: 0, ringO: 1 };     // animated (train: the ring's progress)
+    var T = { data: 0, rows: 0, robot: 0 };                                              // targets
+    var V = { data: 0, rows: 0, robot: 0, morph: 0, wires: 0, legacy: 0, legacyIn: 1, merge: 1, train: 0, ringO: 1 };     // animated (train: the ring's progress)
     var labelGroup = '', labelTok = 0;
 
     /* ---------------------------------------------------------------- materials */
@@ -137,6 +185,7 @@
       lm: ['#3D6BFF', '#6C5CFF', '#A85BFF'],
       fut: ['#7D8BFF', '#B48CFF', '#E4D8FF'],
       act: ['#0FB89A', '#2ED3C6', '#7BE495'],
+      robot: ['#16B364', '#12A6C4'],                // the robot demonstrations' traces into the generator: green, teal
       legacy: ['#9a9aa3', '#c4c4cc', '#8a8a93']
     };
 
@@ -276,7 +325,7 @@
     var N = 32, TILE = 1.5 / N, GROW_Y = 1.25;                              // GROW_Y: the stack's middle, where a pop scales from
     var STEP_AT = [1.35, 2.35, 3.35], DOMAIN_LEN = 4.5;                    // a domain: three context frames arrive, then three steps
     var ACT_T0 = 0.06, ACT_FLY = 0.3, SIM_T0 = 0.25, SIM_FPS = 60, CHUNK_REST = 0.16, SAMPLE_REST = 0.45;   // LaLa-Policy: twice v3's pace
-    var GEN_X = 1.62, GEN_S = 0.8, GEN_N = 4, ACT = 16, SIM_S = 1.42;
+    var GEN_X = 1.62, GEN_S = 0.8, GEN_N = 4, ACT = 16, SIM_S = 1.42, GEN_Y = Y_LM0 + (NLM - 1) * P_LM + 0.1;   // GEN_Y: its lowest plate, at rest
     var POL = MEDIA.policy;
     var simTex = {}, simImg = {}, simAtlas = {};
     POL.forEach(function (p) {
@@ -291,7 +340,7 @@
 
     var byKey = {}; DOMAINS.forEach(function (d) { byKey[d.key] = d; }); byKey[WVID.key] = WVID;
     var WORLD_SEQ = ['pusht', 'metaworld', 'droid', 'granular', 'wall', 'rope', 'pointmaze', 'openvid'].map(function (k) { return byKey[k]; });
-    var HERO_DOMAIN = 1;   // the opening shot starts on Meta-World
+    var HERO_DOMAIN = 1;   // LaLa-World's chapter starts on Meta-World
 
     /* shared geometry / materials of the model parts */
     var tokenCapsule = new THREE.CapsuleGeometry(0.014, 0.028, 4, 10);   // two thirds of V1's token
@@ -331,12 +380,12 @@
     var camR = new THREE.Vector3(), camU = new THREE.Vector3(), camF = new THREE.Vector3();
     var ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
-    /* ================================================================ the model (the film's model, and the LaLa-Policy
-       twin of the opening shot) */
+    /* ================================================================ the model. V.gen: the action generator alone, without
+       LaLa-Policy's simulator and players (the opening) */
     var models = [];
     function makeModel(opt) {
-      var M = { id: models.length, opt: opt, active: true, pop: 1, grow: 1, cardScale: 1, anchors: {}, L: {},
-        T: { explode: 0, card: 1, policy: 0 }, V: { explode: 0, card: 1, policy: 0, reveal: 1 } };
+      var M = { id: models.length, opt: opt, active: true, pop: 1, grow: 1, anchors: {}, L: {},
+        T: { explode: 0, card: 1, policy: 0 }, V: { explode: 0, card: 1, policy: 0, reveal: 1, gen: 0 } };
       var root = new THREE.Group(); scene.add(root);      // placed by the shots
       var world = new THREE.Group(); root.add(world);     // the stack (scaled while it pops in after the merge)
       M.root = root; M.world = world;
@@ -569,7 +618,6 @@
       function frame(d, j) { return img[d.key + ':' + j]; }
       function enterDomain(instant, wait) {
         var d = wp.list[wp.di]; wp.k = 0; wp.t = 0; wp.wait = wait || 0;
-        if (M.onDomain) M.onDomain(wp.di, d);
         var to = patchColors(d.key + ':3', frame(d, 3));
         var settled = obsQ.length === 3 && deckQ.length === 3 && obsAnim.u >= 1 && deckAnim.u >= 1 && !obsPending.length && !deckPending.length;
         if (!instant && settled) {   // nothing moves: the three observations, their cards and the future dissolve
@@ -624,7 +672,7 @@
         stage.cancel(tag);
         if (inst) M.V.policy = M.T.policy;
         else if (!on) { var from = M.V.policy; anim(0.8, function (k) { M.V.policy = from * (1 - k); }, ease.inOutCubic, tag); }
-        else if (M.V.policy < 1) { var f0 = M.V.policy; anim(1.7 * (1 - f0), function (k) { M.V.policy = lerp(f0, 1, k); }, ease.linear, tag); }
+        else if (M.V.policy < 1) { var f0 = M.V.policy; anim((o.dur || 1.7) * (1 - f0), function (k) { M.V.policy = lerp(f0, 1, k); }, ease.linear, tag); }
         if (on && (!was || inst)) policySample(o.sample || 0, inst);
         if (!on && (was || inst)) M.playWorld(WORLD_SEQ, o.domain || 0, { instant: inst });
       };
@@ -730,7 +778,7 @@
         if ((n > 0.5) !== deckNight) { deckNight = n > 0.5; deck.forEach(function (C) { if (C.label) paintCard(C); if (C.fading) paintCard(C, true); }); }   // restyle at the halfway point
         if (deckAnim.u < 1) deckAnim.u = Math.min(1, deckAnim.u + dt / deckAnim.dur);
         if (deckAnim.u >= 1 && deckPending.length) startCard(deckPending.shift());
-        var du = ease.inOutCubic(deckAnim.u), cs = M.cardScale;
+        var du = ease.inOutCubic(deckAnim.u);
         xu = ease.inOutSine(xfade.u);   // a domain change may have begun in this frame
         var cv = clamp01(M.V.card) * (opt.rows ? 1 - smooth(0.0, 0.6, V.rows) : 1) * (ws > 0.5 ? 1 : 0) * smooth(0.75, 1, rv);
         cardAnchor.set(-PL / 2 - 0.42, yLM0 + 0.42 + e * 0.15, 0.32);
@@ -744,9 +792,9 @@
           [[C.m, C.w, C.h, C.fading ? al * (1 - smooth(0.5, 1, xu)) : al, 0], [C.m2, C.w2, C.h2, C.fading ? al * smooth(0, 0.6, xu) : 0, 0.5]].forEach(function (F) {
             var m = F[0]; m.visible = F[3] > 0.01;
             if (!m.visible) return;
-            m.position.copy(cardAnchor).addScaledVector(camR, -0.085 * s * cs).addScaledVector(camU, 0.105 * s * cs).addScaledVector(camF, 0.05 * Math.max(0, s));
+            m.position.copy(cardAnchor).addScaledVector(camR, -0.085 * s).addScaledVector(camU, 0.105 * s).addScaledVector(camF, 0.05 * Math.max(0, s));
             m.quaternion.copy(stage.camera.quaternion);
-            m.scale.set(F[1] * k * cs, F[2] * k * cs, 1);
+            m.scale.set(F[1] * k, F[2] * k, 1);
             m.material.opacity = F[3]; m.material.color.setScalar(lerp(1, 0.94, n) * (1 - 0.06 * clamp01(s)));
             m.renderOrder = 9 - Math.round(C.s1) + F[4];
           });
@@ -756,12 +804,11 @@
         langCable.set(A, B, Cv); langCable.material.uniforms.uO.value = cv * 0.95;
         portMat.opacity = Math.max(cv, opt.rows ? V.wires : 0) * 0.9;
 
-        /* LaLa-Policy: the generator buds off beside the future plate, then acts */
-        var pp = M.V.policy, pOn = smooth(0.85, 1.0, pp);
-        gen.visible = bridge.visible = acts.visible = pp > 0.005;
-        sim.visible = gen.visible && !M.noSim;   // the compact opening pair leaves the simulator out
+        /* LaLa-Policy: the generator buds off beside the future plate, then acts (the opening's generator, V.gen: no simulator) */
+        var pp = Math.max(M.V.policy, M.V.gen), sp = M.V.policy, pOn = smooth(0.85, 1.0, pp);
+        gen.visible = bridge.visible = pp > 0.005; sim.visible = acts.visible = sp > 0.005;
         simShadow.visible = sim.visible;
-        var popAt = function (start, dur) { var u = clamp01((pp - start) / (dur || 0.24)); return u <= 0 ? 0.0001 : ease.outBack(u); };
+        var popAt = function (start, dur, v) { var u = clamp01(((v == null ? pp : v) - start) / (dur || 0.24)); return u <= 0 ? 0.0001 : ease.outBack(u); };
         var genY = yTop + 0.1;
         gen.position.set(GEN_X, 0, 0);
         genPlates.forEach(function (g, k) {
@@ -772,7 +819,7 @@
         runRiser(tokAct, t, genY - 0.02, genY + (GEN_N - 1) * 0.105 + 0.06, pOn, genPlates, 0.105, GEN_X);
         A.set(0.55, yTop + 0.02, 0.35); Cv.set(GEN_X - 0.12, genY - 0.03, 0.08); B.set(1.05, yTop + 0.02, 0.32);
         bridge.set(A, B, Cv); bridge.material.uniforms.uO.value = clamp01((pp - 0.55) / 0.3);
-        sim.scale.setScalar(popAt(0.62, 0.3)); simShadow.material.opacity = clamp01((pp - 0.62) / 0.3);
+        sim.scale.setScalar(popAt(0.62, 0.3, sp)); simShadow.material.opacity = clamp01((sp - 0.62) / 0.3);
         M.anchors.acts.position.set(lerp(GEN_X, SIM.x, 0.5), genY + 0.75, 0.3);
         // the actions leave the generator, arc over and land on the simulator screen
         var gTop = genY + (GEN_N - 1) * 0.105 + 0.05;
@@ -798,8 +845,6 @@
     }
 
     var main = makeModel({ ring: true, rows: true });
-    var twin = makeModel({});   // LaLa-Policy, beside LaLa-World in the opening frame only
-    twin.active = false;
 
     /* ---------------------------------------------------------------- domain-specific predecessors: seven small grey models */
     var legacySpec = [['PUSH-T', '2-D action', 'pusht'], ['POINTMAZE', '2-D action', 'pointmaze'], ['WALL', '2-D action', 'wall'],
@@ -876,6 +921,7 @@
 
     /* ---------------------------------------------------------------- data: transition cards around the model */
     var data = new THREE.Group(); scene.add(data);
+    var dataTurn = 0;   // the arc's turn about the model (the opening's OPEN.rot; eased only while it stays in view)
     var groupTag = { sim: 'Simulation', robot: 'Real robot', video: 'Video', edit: 'Image edit' };
     function pairCanvas(o) {   // name / tag, current → future, the sentence that links them
       var W = 1024, pad = 40, gap = 54, iw = (W - pad * 2 - gap) / 2, ih = Math.round(iw * Math.min(1, o.h / o.w));
@@ -913,8 +959,30 @@
         var rb = stage.fx.ribbon(new THREE.QuadraticBezierCurve3(start, mid, end).getPoints(64), 0.036);
         streams.add(new THREE.Mesh(rb.geometry, stage.fx.pulseMaterial(s[0], { gap: 1.0, speed: 1.15, offset: stage.rng(o.angle * 17 + k + 3 + o.radius)() })));
       });
-      var C = Object.assign({ grp: grp, shadow: sh, streams: streams, home: home, mats: [], i: dataCards.length }, o);
+      var C = Object.assign({ grp: grp, shadow: sh, streams: streams, home: home, mats: [], i: dataCards.length, born: 0 }, o);
       C.stag = o.tier === 1 ? C.i * 0.06 : (o.order || 0) * 0.05;   // entry stagger (the video cards join later)
+      dataCards.push(C); return C;
+    }
+    /* a robot demonstration (the opening): on the arc like the others (angle, radius, y: its foot), facing the model; both
+       its traces run from its foot into the action generator (green, teal) */
+    var rdata = new THREE.Group(); scene.add(rdata);   // not turned with the others' arc (OPEN.rot)
+    function placeRobot(o) {
+      var a = THREE.MathUtils.degToRad(o.angle), grp = new THREE.Group(); rdata.add(grp);
+      var home = new THREE.Vector3(Math.sin(a), 0, -Math.cos(a)).multiplyScalar(o.radius).setY(o.y + o.height / 2);
+      grp.position.copy(home); grp.lookAt(0, home.y, 0);
+      var sh = stage.softShadow(o.width * 0.9, 0.22, { blur: 22, alpha: 0.26, radius: 0.5 });
+      sh.position.set(home.x, 0.002, home.z); sh.rotation.z = -a; sh.material.opacity = 0; rdata.add(sh);
+      var streams = new THREE.Group(); rdata.add(streams);
+      var G = new THREE.Vector3(GEN_X, 0, 0), toCard = home.clone().setY(0).sub(G).normalize(), across = new THREE.Vector3(-toCard.z, 0, toCard.x);
+      var face = new THREE.Vector3(1, 0, 0).applyQuaternion(grp.quaternion);   // the card's own left → right
+      [[PAL.robot[0], GEN_Y + 0.06, -0.08], [PAL.robot[1], GEN_Y + 0.27, 0.08]].forEach(function (s, k) {
+        var end = G.clone().addScaledVector(toCard, GEN_S / 2 + 0.03).addScaledVector(across, s[2]).setY(s[1]);
+        var start = home.clone().addScaledVector(face, s[2]).setY(o.y + 0.06);
+        var mid = start.clone().lerp(end, 0.5).setY(Math.max(o.y, s[1]) + 0.75 + k * 0.12);
+        var rb = stage.fx.ribbon(new THREE.QuadraticBezierCurve3(start, mid, end).getPoints(64), 0.036);
+        streams.add(new THREE.Mesh(rb.geometry, stage.fx.pulseMaterial(s[0], { gap: 1.0, speed: 1.15, offset: stage.rng(o.ri * 31 + k + 7)() })));
+      });
+      var C = Object.assign({ grp: grp, shadow: sh, streams: streams, home: home, mats: [], i: dataCards.length, tier: 3, born: 0 }, o);
       dataCards.push(C); return C;
     }
     // tier 1: the control domains — each card steps through the six transitions of one episode
@@ -965,7 +1033,7 @@
       tex.wrap(g, text, VID_W - VID_PAD * 2).slice(0, 2).forEach(function (ln, i) { g.fillText(ln, VID_PAD, 50 + i * 44); });
       C.capTex.needsUpdate = true;
     }
-    /* the OpenVid cards: their atlases come with media-video.js, which the page loads once the model stands */
+    /* the OpenVid cards: their atlases come with media-video.js, which the page loads right after the model */
     var videoJob = null;
     function addVideo(OV) {
       if (videoJob) return videoJob;
@@ -989,6 +1057,43 @@
       });
       C.front = 0; C.fade = 1; C.oe = true;
     })();
+    // tier 3, the opening only: the robot demonstrations LaLa-Policy learns from (two views of one episode, its task
+    // sentence), their traces into the action generator. Placed by OPEN.cards
+    var RB_GAP = 32, RB_IW = (VID_IW - RB_GAP) / 2, RB_H = VID_PAD + VID_HEAD + RB_IW + VID_CAP + VID_PAD - 20;
+    function robotCard(r, o) {
+      var width = o.width, height = width * RB_H / VID_W, k = width / VID_W;
+      var C = placeRobot(Object.assign({ height: height, kind: 'robot', r: r, vt: o.ri * 0.83 }, o));
+      var base = tex.canvas(VID_W, RB_H), g = base.getContext('2d');
+      tex.rrect(g, 2, 2, VID_W - 4, RB_H - 4, 46); g.fillStyle = 'rgba(255,255,255,.97)'; g.fill();
+      g.lineWidth = 3; g.strokeStyle = 'rgba(22,179,100,.3)'; g.stroke();   // LaLa-Policy's colour: the edge, and a dot by the name
+      var dg = g.createLinearGradient(VID_PAD, 0, VID_PAD + 22, 0); dg.addColorStop(0, PAL.robot[0]); dg.addColorStop(1, PAL.robot[1]);
+      g.fillStyle = dg; g.beginPath(); g.arc(VID_PAD + 10, VID_PAD + 22, 10, 0, Math.PI * 2); g.fill();
+      g.textBaseline = 'alphabetic'; g.font = tex.font(650, 36); g.fillStyle = '#1d1d1f'; g.fillText(r.name, VID_PAD + 32, VID_PAD + 34);
+      g.font = tex.font(500, 25); g.fillStyle = '#86868b'; g.textAlign = 'right'; g.fillText(r.tag, VID_W - VID_PAD, VID_PAD + 32); g.textAlign = 'left';
+      g.font = tex.font(540, 33); g.fillStyle = COL.lang;
+      tex.wrap(g, r.text, VID_W - VID_PAD * 2).slice(0, 2).forEach(function (ln, i) { g.fillText(ln, VID_PAD, RB_H - 98 + i * 44); });
+      var bm = new THREE.Mesh(new THREE.PlaneGeometry(width, height), basic(tex.texture(base), { opacity: 0 })); bm.renderOrder = 5; C.grp.add(bm); C.mats.push(bm.material);
+      C.views = r.views.map(function (a, vi) {   // side by side, played together
+        var im0 = img['rb:' + r.key + ':' + vi], im = atlasImage(im0), vm = atlasMaterial(atlasTexture(im));
+        vm.uniforms.uSize.value.set(RB_IW * k, RB_IW * k); vm.uniforms.uR.value = 22 * k;
+        var vp = new THREE.Mesh(new THREE.PlaneGeometry(RB_IW * k, RB_IW * k), vm);
+        vp.position.set((vi - 0.5) * (RB_IW + RB_GAP) * k, height / 2 - (VID_PAD + VID_HEAD - 22 + RB_IW / 2) * k, 0.002); vp.renderOrder = 6; C.grp.add(vp);
+        return { mat: vm, atlas: atlasOf(a, im, im0), img: im };
+      });
+      return C;
+    }
+    /* the robot demonstrations: their atlases come with robot.js, which the page loads right after the model */
+    var robotJob = null;
+    function addRobots(RB) {
+      if (robotJob) return robotJob;
+      var jobs = [], byEp = {};
+      RB.forEach(function (r) { byEp[r.key] = r; r.views.forEach(function (a, i) { jobs.push(load('rb:' + r.key + ':' + i, a.src)); }); });
+      return (robotJob = Promise.all(jobs).then(function () {
+        OPEN.cards.forEach(function (c, i) { if (byEp[c.ep]) robotCard(byEp[c.ep], Object.assign({ ri: i }, c)); });
+        warm(rdata);
+      }));
+    }
+    var NRB = OPEN.cards.length;
 
     /* ---------------------------------------------------------------- labels (the film's model) */
     var an = main.anchors;
@@ -1001,36 +1106,32 @@
     stage.labels.add({ anchor: an.acts, html: '<i class="act">Actions</i>', dx: 50, dy: -55, group: 'policy' });
 
     /* ---------------------------------------------------------------- shot logic */
-    var XL = -3.0, XR = 1.25;   // the opening frame: LaLa-World left, LaLa-Policy right
-    var compact = false;        // narrow screens: the pair stands closer, without its cards and LaLa-Policy's simulator
-    function placePair() {
-      main.root.position.x = compact ? -1.05 : XL; twin.root.position.x = compact ? 0.95 : XR;
-      main.cardScale = twin.cardScale = 0.75;
-      twin.noSim = compact;
-      main.T.card = twin.T.card = compact ? 0 : 1;
-      if (compact) main.V.card = twin.V.card = 0;
-    }
-    function layoutSolo() {
-      twin.active = false;
-      main.root.position.x = 0; main.cardScale = 1;
-    }
+    var compact = false;   // a narrow opening frame (setCompact): the lens fits OPEN.compact
     function setScene(name, ctx, o) {
-      var inst = ctx && ctx.instant;
-      ['legacy', 'words', 'evolve', 'start', 'hero', 'reveal', 'grow', 'end'].forEach(function (tg) { stage.cancel(tg); });
-      if (!(o && o.keepLayout)) layoutSolo();
-      if (name !== 'hero') models.forEach(function (M) {   // a shot left mid-pop: back to full size
+      var inst = ctx && ctx.instant, fromChart = !!charts.shown;
+      if (!(o && o.chart)) charts.go(null);
+      ['legacy', 'words', 'evolve', 'hero', 'reveal', 'grow', 'gen', 'datain', 'open', 'end'].forEach(function (tg) { stage.cancel(tg); });
+      models.forEach(function (M) {   // a shot left mid-pop: back to full size
         if (M.grow === 1) return;
         var g0 = M.grow;
         if (inst) M.grow = 1; else anim(0.5, function (k) { M.grow = lerp(g0, 1, k); }, ease.outCubic, 'grow');
       });
-      if (name !== 'hero') {
-        if (inst) main.V.reveal = 1;
-        else if (main.V.reveal < 1) { var r0 = main.V.reveal; anim(0.6, function (k) { main.V.reveal = lerp(r0, 1, k); }, ease.outCubic, 'reveal'); }
+      if (inst) main.V.reveal = 1;   // a shot left mid-build: built
+      else if (main.V.reveal < 1) { var r0 = main.V.reveal; anim(0.6, function (k) { main.V.reveal = lerp(r0, 1, k); }, ease.outCubic, 'reveal'); }
+      if (name !== 'open' && name !== 'policy' && main.V.gen > 0) {   // the opening's generator folds back (LaLa-Policy's takes it over)
+        var g0 = main.V.gen;
+        if (inst) main.V.gen = 0; else anim(0.7, function (k) { main.V.gen = g0 * (1 - k); }, ease.inOutCubic, 'gen');
       }
-      V.legacy = 0; V.merge = 1; T.rows = 0;
+      V.legacy = 0; V.merge = 1; T.rows = 0; T.robot = 0;
+      dataTurn = name === 'open' ? -THREE.MathUtils.degToRad(OPEN.rot || 0) : 0;   // OPEN.rot counts like the cards' angles (< 0: to the left)
+      if (inst) data.rotation.y = dataTurn;
       main.T.explode = name === 'latent' ? 0.7 : 0;
       T.data = name === 'data1' ? 1 : name === 'data2' || name === 'evolve' ? 2 : 0;
       main.T.card = T.data ? 0 : 1;
+      if (fromChart && T.data && !inst) {   // the data comes back once the chart has gone
+        var td = T.data; T.data = 0;
+        stage.wait(0.5, 'datain').then(function () { if (!ctx || ctx.alive()) T.data = td; });
+      }
       if (name !== 'evolve' && V.train > 0 && V.ringO > 0) {   // the training ring fades once LaLa-Policy is on its own
         var o0 = V.ringO; stage.cancel('train');
         if (inst) V.ringO = 0; else anim(0.8, function (k) { V.ringO = o0 * (1 - k); }, ease.inOutCubic, 'train');
@@ -1038,55 +1139,52 @@
       // labels come in once the camera has settled (and the background has finished changing)
       var lt = ++labelTok;   // a cancelled wait still resolves: only the latest may set the labels
       stage.cancel('labels'); labelGroup = '';
-      var lgName = name === 'latent' ? 'latent' : name === 'policy' ? 'policy' : '';
+      var lgName = o && o.chart ? '' : name === 'latent' ? 'latent' : name === 'policy' ? 'policy' : '';
       if (lgName && inst) labelGroup = lgName;
       else if (lgName) stage.wait(2.1, 'labels').then(function () { if (lt === labelTok && (!ctx || ctx.alive())) labelGroup = lgName; });
       main.setPolicy(name === 'policy' || name === 'end', ctx);
-      if (inst) { main.V.explode = main.T.explode; V.data = T.data; main.V.card = main.T.card; V.rows = T.rows; }
+      if (inst) { main.V.explode = main.T.explode; V.data = T.data; main.V.card = main.T.card; V.rows = T.rows; V.robot = T.robot; }
     }
-    /* 0 — the opening frame: both models side by side under the title */
-    function startShot(ctx) {
-      var wasPair = twin.active;
-      setScene('start', ctx, { keepLayout: true });
-      twin.active = true;
-      placePair();
-      if (ctx.instant || wasPair) {
-        main.V.reveal = twin.V.reveal = 1;
-        if (!wasPair) { main.playWorld(WORLD_SEQ, 0, { instant: true }); twin.setPolicy(true, { instant: true, sample: 1 }); }
-        return;
-      }
-      // from another shot: both build up (layer by layer, at full size)
-      stage.cancel('reveal'); stage.cancel('grow'); main.grow = twin.grow = 1;
-      main.playWorld(WORLD_SEQ, 0, { instant: true, wait: 1.3 });
-      twin.setPolicy(true, { instant: true, sample: 1 });
-      main.V.reveal = twin.V.reveal = 0;
-      return anim(1.4, function (k) { main.V.reveal = twin.V.reveal = k; }, ease.linear, 'start');
-    }
-    /* 1 — the opening pair pops away, the poster is pulled back; then it falls out of focus as the model pops in front of
-       it (whole, small → 110 % → 100 %: the layer-by-layer build belongs to the opening frame). After a cut the pair has
-       already scrolled away with the page, and the model comes sooner. */
-    function heroShot(ctx) {
-      setScene('hero', ctx, { keepLayout: true });
-      stage.cancel('poster');
-      if (ctx.instant) {
-        layoutSolo(); main.V.reveal = 1; main.grow = twin.grow = 1; main.playWorld(WORLD_SEQ, HERO_DOMAIN, { instant: true });
-        WL.pull = WL.soft = 1; return;
-      }
-      WL.pull = WL.soft = 0;
-      anim(0.9, function (k) { WL.pull = k; }, ease.linear, 'poster');
-      var g0 = main.grow, g1 = twin.active ? twin.grow : 0;
-      if (ctx.cut) main.grow = twin.grow = 0;
-      var away = ctx.cut ? Promise.resolve() : anim(0.45, function (k) { main.grow = g0 * (1 - k); twin.grow = g1 * (1 - k); }, ease.inBack, 'hero');
-      return away.then(function () {
-        if (!ctx.alive()) return;
-        layoutSolo(); twin.grow = 1; main.grow = 0; main.V.reveal = 1;
-        main.playWorld(WORLD_SEQ, HERO_DOMAIN, { instant: true, wait: ctx.cut ? 1.2 : 1.75 });   // steps once the model stands
-        return stage.wait(ctx.cut ? 0.45 : 1.35, 'hero');
-      }).then(function () {
-        if (!ctx.alive()) return;
-        anim(2.0, function (k) { WL.soft = k; }, ease.linear, 'poster');
-        return anim(0.75, function (k) { main.grow = k; }, ease.outBack, 'hero');
+    /* the opening — LaLa-World builds up in the middle while the camera closes in, and the data of "Video, too" comes in
+       around it; then its action generator buds off beside it and the robot demonstrations come in (OPEN_AT). Video and
+       robot cards whose files are still on their way drop in when they arrive */
+    function openWall(ctx) {
+      setScene('open', ctx);
+      stage.cancel('reveal');
+      main.T.card = 0;
+      if (ctx.instant) { main.V.card = 0; main.V.reveal = main.V.gen = 1; T.data = V.data = 2; T.robot = V.robot = 1; return; }
+      main.V.card = 0; main.V.reveal = main.V.gen = 0; T.data = V.data = 0; T.robot = V.robot = 0;
+      stage.flyTo(OPEN.from, 0); stage.flyTo(viewOf(ctx.shot), OPEN.dur, ease.inOutSine);   // the slow approach
+      main.playWorld(WORLD_SEQ, 0, { instant: true, wait: OPEN.wait });
+      anim(OPEN.build, function (k) { main.V.reveal = k; }, ease.linear, 'open');
+      [[OPEN_AT.data, OPEN.run.data, function (k) { T.data = V.data = 2 * k; }, ease.inOutSine],
+        [OPEN_AT.gen, OPEN.run.gen, function (k) { main.V.gen = k; }, ease.linear],
+        [OPEN_AT.robot, OPEN.run.robot, function (k) { T.robot = V.robot = k; }, ease.inOutSine]].forEach(function (a) {
+        stage.wait(a[0], 'open').then(function () { if (ctx.alive()) anim(a[1], a[2], a[3], 'open'); });
       });
+    }
+    /* LaLa-World — the model in the middle with its instruction card. After a cut the opening's data, robot demonstrations
+       and generator have scrolled away with the page: they are simply gone, and the world player starts again on
+       Meta-World. (Played without a cut, the film's: they step away quickly, then the card comes) */
+    function heroShot(ctx) {
+      var fromWall = (V.data > 0.5 || V.robot > 0.5) && !ctx.instant && !ctx.cut;
+      setScene('hero', ctx);
+      if (fromWall) {
+        var d0 = V.data, r0 = V.robot; main.T.card = 0;
+        anim(0.7, function (k) { T.data = V.data = d0 * (1 - k); V.robot = r0 * (1 - k); }, ease.inOutSine, 'hero');
+        stage.wait(0.8, 'hero').then(function () { if (ctx.alive()) main.T.card = 1; });
+      }
+      if (ctx.cut) { stage.cancel('gen'); main.V.gen = 0; V.data = 0; V.robot = 0; }
+      if (ctx.instant || ctx.cut) main.playWorld(WORLD_SEQ, HERO_DOMAIN, { instant: true, wait: ctx.instant ? 0 : 0.5 });
+    }
+    /* P1–P4: the 3D scene under a chart — the model alone (the data steps away), or LaLa-Policy for its own chart — and
+       the chart itself (after a cut, as the picture comes in) */
+    function chartShot(name, ctx) {
+      var policy = name === 'p4';
+      setScene(policy ? 'policy' : 'chart', ctx, { chart: true });
+      if (policy) main.T.card = 0;   // its instruction card would stand by the chart
+      if (ctx.instant) main.V.card = main.T.card;
+      charts.go(name, { at: ctx.instant ? 0 : ctx.cut ? Math.min(0.15, ctx.shot.chartAt) : ctx.shot.chartAt || 0, instant: ctx.instant });
     }
     /* 7 — the training ring closes under the model with all the data still around it; then the data steps away, the
        camera comes back to the model (about its size in shot 1) and the action generator buds off as the ring fades */
@@ -1100,24 +1198,24 @@
         stage.flyTo(viewOf(EVOLVE_NEAR), 0); main.setPolicy(true, { instant: true }); return;
       }
       V.train = 0;
-      return stage.wait(0.8, 'evolve').then(function () {
+      return stage.wait(0.6, 'evolve').then(function () {   // the ring 0.6–2.4 s, the move to the model 2.6–4.3, LaLa-Policy 3.8–5.2
         if (!ctx.alive()) return;
-        return anim(2.2, function (k) { V.train = k; }, ease.inOutSine, 'evolve');
+        return anim(1.8, function (k) { V.train = k; }, ease.inOutSine, 'evolve');
       }).then(function () {
         if (!ctx.alive()) return;
-        return stage.wait(0.3, 'evolve');
+        return stage.wait(0.2, 'evolve');
       }).then(function () {
         if (!ctx.alive()) return;
-        stage.flyTo(viewOf(EVOLVE_NEAR), 1.9).then(function () { if (ctx.alive()) stage.drift(-4, 6); });
-        return anim(1.1, function (k) { T.data = V.data = 2 * (1 - k); }, ease.inOutSine, 'evolve');   // the data steps away
+        stage.flyTo(viewOf(EVOLVE_NEAR), 1.7).then(function () { if (ctx.alive()) stage.drift(-4, 6); });
+        return anim(1.0, function (k) { T.data = V.data = 2 * (1 - k); }, ease.inOutSine, 'evolve');   // the data steps away
       }).then(function () {
         if (!ctx.alive()) return;
-        return stage.wait(0.3, 'evolve');
+        return stage.wait(0.2, 'evolve');
       }).then(function () {
         if (!ctx.alive()) return;
-        main.setPolicy(true, ctx);
+        main.setPolicy(true, { dur: 1.4 });
         stage.wait(0.45, 'evolve').then(function () { if (ctx.alive()) main.T.card = 1; });   // the instruction card, once the action cards have gone
-        return anim(1.2, function (k) { V.ringO = 1 - k; }, ease.inOutSine, 'train');
+        return anim(1.0, function (k) { V.ringO = 1 - k; }, ease.inOutSine, 'train');
       });
     }
     /* 4 — the one model (and the sentences of shot 3) pops away, seven domain-specific models pop in one by one and
@@ -1129,17 +1227,17 @@
       stage.cancel('grow');
       var g0 = main.grow, r0 = V.rows;
       if (ctx.cut) V.rows = 0;   // the last chapter's picture has scrolled away: the seven come at once
-      var away = ctx.cut ? Promise.resolve() : anim(0.4, function (k) { main.grow = g0 * (1 - k); V.rows = r0 * (1 - k); }, ease.inBack, 'legacy');
+      var away = ctx.cut ? Promise.resolve() : anim(0.35, function (k) { main.grow = g0 * (1 - k); V.rows = r0 * (1 - k); }, ease.inBack, 'legacy');
       return away.then(function () {
         if (!ctx.alive()) return;
         V.legacy = 1; V.merge = 0; V.legacyIn = 0; main.grow = 1;   // the one model stays hidden (pop 0) until the merge
-        return anim(0.9, function (k) { V.legacyIn = k; }, ease.linear, 'legacy');
+        return anim(0.8, function (k) { V.legacyIn = k; }, ease.linear, 'legacy');
       }).then(function () {
         if (!ctx.alive()) return;
-        return stage.wait(1.7, 'legacy');
+        return stage.wait(1.1, 'legacy');
       }).then(function () {
         if (!ctx.alive()) return;
-        return anim(1.8, function (k) { V.merge = k; }, ease.inOutCubic, 'legacy');
+        return anim(1.5, function (k) { V.merge = k; }, ease.inOutCubic, 'legacy');
       }).then(function () {
         if (!ctx.alive()) return;
         V.legacy = 0; main.T.card = 1;
@@ -1168,15 +1266,12 @@
     }
 
     /* ---------------------------------------------------------------- the backgrounds, as the page mixes them */
-    function lookOf(name) {
-      if (name !== 'world') return LOOK[name];
-      return mixRaw(mixRaw(LOOK.posterCover, LOOK.poster, ease.inOutCubic(WL.pull)), LOOK.posterSoft, ease.inOutCubic(WL.soft));
-    }
+    function lookOf(name) { return LOOK[name] || LOOK.paper; }   // 'paper' b, 'chart' b fainter, 'sky' c
 
     /* ---------------------------------------------------------------- per frame */
     stage.onUpdate(function (dt, t) {
       var n = stage.night, kk = 1 - Math.exp(-dt * 3.2);
-      V.data += (T.data - V.data) * kk; V.rows += (T.rows - V.rows) * kk;
+      V.data += (T.data - V.data) * kk; V.rows += (T.rows - V.rows) * kk; V.robot += (T.robot - V.robot) * kk;
 
       /* domain-specific models → merge into one stack */
       var lg = V.legacy, mg = V.merge;
@@ -1211,12 +1306,16 @@
         R.wire.set(A, B, Cv); R.wire.material.uniforms.uO.value = rws * clamp01(V.wires * 1.3 - i * 0.06);
       });
 
-      /* data cards: tier 1 = control domains; tier 2 = video + image edit, drops in second */
-      var d1 = clamp01(V.data), d2 = clamp01(V.data - 1);
-      data.visible = d1 > 0.01;
+      /* data cards: tier 1 = control domains; tier 2 = video + image edit, drops in second; tier 3 = the robot
+         demonstrations (the opening), on their own clock */
+      var d1 = clamp01(V.data), d2 = clamp01(V.data - 1), d3 = clamp01(V.robot);
+      data.visible = d1 > 0.01; rdata.visible = d3 > 0.01;
+      if (V.data < 0.02) data.rotation.y = dataTurn; else if (T.data > 0) data.rotation.y += (dataTurn - data.rotation.y) * kk;   // leaving, it keeps its turn
       dataCards.forEach(function (C) {
-        var local = C.tier === 1 ? clamp01(d1 * 1.5 - C.stag) : clamp01(d2 * 1.6 - C.stag);
-        C.grp.position.y = C.home.y + (1 - ease.outCubic(local)) * (C.tier === 2 ? 1.6 : 0.25);
+        if (C.born < 1) C.born = Math.min(1, C.born + dt / 0.6);   // a card whose file came late drops in on its own
+        var local = Math.min(C.born, C.tier === 1 ? clamp01(d1 * 1.5 - C.stag) : C.tier === 2 ? clamp01(d2 * 1.6 - C.stag)
+          : clamp01(d3 * 1.5 - 0.5 * C.ri / Math.max(1, NRB - 1)));
+        C.grp.position.y = C.home.y + (1 - ease.outCubic(local)) * (C.tier === 1 ? 0.25 : 1.6);
         C.shadow.material.opacity = local;
         stage.fx.setUniform(C.streams, 'uOpacity', local);
         var cc = lerp(1, 0.82, n);
@@ -1233,6 +1332,14 @@
               else { C.step = (C.step + 1) % C.d.steps.length; var st = C.d.steps[C.step];
                 stepPairCard(C, img[C.d.key + ':' + st.a], img[C.d.key + ':' + st.b], st.text, C.d.name, groupTag[C.d.group] + ' · ' + C.d.dims + ' action', [C.d.w, C.d.h]); }
             }
+          }
+        } else if (C.kind === 'robot') {
+          C.mats.forEach(function (m) { m.opacity = local; m.color.setScalar(cc); });
+          C.views.forEach(function (w) { w.mat.uniforms.uO.value = local; w.mat.uniforms.uDim.value = cc; });
+          if (local > 0.01) {
+            C.vt += dt;
+            var rf = Math.floor(C.vt * C.r.fps) % C.r.views[0].n;
+            C.views.forEach(function (w) { setFrame(w.mat, w.atlas, w.img, rf); });
           }
         } else {
           C.mats.forEach(function (m) { m.opacity = local; m.color && m.color.setScalar(cc); });
@@ -1270,57 +1377,56 @@
     });
 
     /* ---------------------------------------------------------------- boot */
-    window.__lala = { T: T, V: V, main: main, twin: twin, dataCards: dataCards, stage: stage, SHOTS: SHOTS };   // for the console
+    window.__lala = { T: T, V: V, main: main, dataCards: dataCards, stage: stage, charts: charts, SHOTS: SHOTS };   // for the console
     main.playWorld(WORLD_SEQ, 0, { instant: true });
-    if (opts.onDomain) main.onDomain = opts.onDomain;
     stage.renderer.compile(scene, stage.camera);
     stage.start();
     stage.ready();
     setTimeout(function () { warm(scene); }, 1600);
 
     var byShot = {}; SHOTS.forEach(function (s, i) { byShot[s.key] = i; });
-    var COMPACT_PAIR = [-1.95, 0, -0.9, 3.05, 3.0, 0.9];   // the opening pair on a narrow screen (see placePair)
     var box3 = new THREE.Box3();
     return {
       stage: stage, shots: SHOTS, byShot: byShot,
       goShot: function (i, o) { return stage.goShot(i, o); },
       get shot() { return stage.shotIndex; },
-      /* the lens that scales and moves shot i's box (seen from its framing) into `rect` (NDC, y up), for stage.lens */
+      /* the lens that scales and moves shot i's box (seen from its framing) into `rect` (NDC, y up), for stage.lens; a shot
+         without one (a chart: nothing of the stage in its frame) keeps the film's framing */
       fitShot: function (i, rect, sMax) {
-        var sh = SHOTS[i], b = sh.key === 'start' && compact ? COMPACT_PAIR : sh.box;
+        var sh = SHOTS[i], b = sh.key === 'start' && compact ? OPEN.compact : sh.box;
+        if (!b) return { s: 1, x: 0, y: 0 };
         var p = stage.projectBox(box3.set(box3.min.fromArray(b), box3.max.fromArray(b, 3)), viewOf(sh.key === 'evolve' ? EVOLVE_NEAR : sh));
         var s = Math.min((rect.x1 - rect.x0) / (p.x1 - p.x0), (rect.y1 - rect.y0) / (p.y1 - p.y0));
         s = Math.max(0.3, Math.min(sMax || 1.2, s));
         return { s: s, x: (rect.x0 + rect.x1) / 2 - s * (p.x0 + p.x1) / 2, y: (rect.y0 + rect.y1) / 2 - s * (p.y0 + p.y1) / 2 };
       },
-      /* narrow screens: the opening pair stands closer, without cards and simulator */
-      setCompact: function (on) {
-        if (compact === !!on) return;
-        compact = !!on;
-        if (stage.shotIndex === 0 && twin.active) placePair();
-      },
+      /* a narrow opening frame: the lens fits the model and the cards nearest it (OPEN.compact), the rest is cut */
+      setCompact: function (on) { compact = !!on; },
       /* the turn about the model that goes with the scroll (degrees); snap: from there at once (a new chapter) */
       setYaw: function (deg, snap) { stage.orbit.yaw = THREE.MathUtils.degToRad(deg); if (snap) stage.orbit.snap = true; },
-      /* the picture's opacity over the background: the page fades a chapter's model in and out with the scroll */
+      /* the picture's opacity over the background: the page fades a chapter's model (or chart) in and out with the scroll */
       setFade: function (v) { stage.fade.v = v; },
-      /* the backgrounds, by name ('paper' b, 'world' a, 'sky' c): one look; or two, the second from `at` (screens from the top)
-         down, as the next section of the page scrolls in */
+      /* the picture only inside a rectangle of the canvas (px: x0, y0, x1, y1, soft), or everywhere (null) */
+      setMask: function (r) {
+        var m = stage.mask; m.on = !!r;
+        if (r) { m.x0 = r.x0; m.y0 = r.y0; m.x1 = r.x1; m.y1 = r.y1; if (r.soft != null) m.soft = r.soft; }
+      },
+      /* the backgrounds, by name ('paper' b, 'chart' b fainter, 'sky' c): one look; or two, the second from `at` (screens
+         from the top) down, as the next section of the page scrolls in; or a's pass at u (0 … 1), over the whole screen */
       look: function (name) { stage.bg.to(lookOf(name), 0); stage.bg.split(null); },
       split: function (above, below, at, soft) { stage.bg.to(lookOf(above), 0); stage.bg.split(lookOf(below), at, soft); },
-      lookName: function (i) { var l = SHOTS[i].look; return l === LOOK.sky ? 'sky' : l === LOOK.paper ? 'paper' : 'world'; },
+      pass: function (u) { stage.bg.to(passLook(u), 0); stage.bg.split(null); },
+      lookName: function (i) { var l = SHOTS[i].look; return l === LOOK.sky ? 'sky' : l === LOOK.chart ? 'chart' : 'paper'; },
       isNight: function (name) { return lookOf(name).night > 0.5; },
       /* the model's lighting (studio or night), and the page's colours */
       setLight: function (night) { stage.bg.light = night ? 1 : 0; },
       setNight: function (on) { if ((stage.mode === 'night') !== !!on) stage.setMode(on ? 'night' : 'studio', null); },
       setPaused: stage.setPaused,
+      /* the files that come after the model: the OpenVid clips (media-video.js) and the robot demonstrations (robot.js) */
       addVideo: function () { return window.LALA_MEDIA_VIDEO ? addVideo(window.LALA_MEDIA_VIDEO) : Promise.reject(new Error('no video media')); },
-      /* the chapters' controls */
-      domains: WORLD_SEQ.map(function (d) { return { key: d.key, name: d.name, group: d.group }; }),
-      playDomain: function (i) { if (!main.T.policy) main.playWorld(WORLD_SEQ, i); },
-      get inside() { return !!main.T.explode; },
-      setInside: function (on) { labelTok++; main.T.explode = on ? 0.7 : 0; labelGroup = on ? 'latent' : ''; },
-      get policy() { return !!main.T.policy; },
-      setPolicy: function (on) { labelTok++; main.setPolicy(!!on); labelGroup = on ? 'policy' : ''; }
+      addRobots: function () { return window.LALA_ROBOT_MEDIA ? addRobots(window.LALA_ROBOT_MEDIA) : Promise.reject(new Error('no robot media')); },
+      /* a chart chapter's pin, every frame (see LalaCharts' place); null when none is on the screen */
+      placeChart: function (f) { charts.place(f); }
     };
   }
 })();

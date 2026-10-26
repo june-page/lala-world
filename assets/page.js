@@ -3,8 +3,12 @@
    (data-shot) and is a section whose .pin holds the screen while the section scrolls past (data-pin, in vh): the
    chapter's title rises from below with the page, holds while its shot plays, then scrolls away. The model goes with
    its chapter: the stage's lens moves the picture with the pin, the picture fades out as the chapter leaves and in as
-   the next one arrives, and the shot changes in between, while no model is on the screen. Each chapter's background
-   (b · a · c) comes up the screen with its section, as a page's would. Without WebGL 2 the chapters are plain sections. */
+   the next one arrives, and the shot changes in between, while no model is on the screen. A chapter's frame is four
+   fifths of the screen and holds only briefly, so the top of the next chapter is always coming up below it. The results
+   chapters (P1–P4) hold a chart instead (lala-charts.js), which goes with its pin and fades in the same way. Each
+   chapter's background (b, b fainter behind a chart, c) comes up the screen with its section, as a page's would; between
+   the opening screen and LaLa-World the poster comes out of b and goes back into it as the visitor scrolls. Without
+   WebGL 2 the chapters are plain sections. */
 (function () {
   'use strict';
   var root = document.documentElement;
@@ -24,12 +28,13 @@
 
   /* ---------------------------------------------------------------- chapters */
   var NAMES = { start: 'LaLa-World & LaLa-Policy', world: 'LaLa-World', latent: 'Latent future', words: 'Actions in words', legacy: 'One model',
-    data1: 'Every domain', data2: 'Video, too', evolve: 'Evolve', policy: 'LaLa-Policy', end: 'TL;DR & BibTeX' };
+    data1: 'Every domain', data2: 'Video, too', p1: 'vs. world models', p2: 'Planning time', p3: 'Training cost', evolve: 'Evolve',
+    policy: 'LaLa-Policy', p4: 'vs. other policies', end: 'TL;DR & BibTeX' };
+  var CHART = { p1: 1, p2: 1, p3: 1, p4: 1 };   // the chapters that hold a chart
   var chapters = $$('[data-shot]').map(function (el, i) {
     return { i: i, el: el, key: el.getAttribute('data-shot'), pinEl: $('.pin', el), pin: parseFloat(el.getAttribute('data-pin') || '0'),
-      cap: $('.cap', el), ctl: $('.ctl', el), top: 0, h: 0, a: -Infinity, lens: null };
+      cap: $('.cap', el), top: 0, h: 0, a: -Infinity, lens: null, band: null };
   });
-  var byKey = {}; chapters.forEach(function (c) { byKey[c.key] = c; });
   var LAST = chapters.length - 1;
 
   // the browser's toolbar follows the night chapters
@@ -76,7 +81,7 @@
     H = first ? first.offsetHeight : vh;   // a pin is one screen tall (the small viewport on phones)
     X = 0.4 * H; OUT = 0.12 * H;
     chapters.forEach(function (c, i) {
-      var r = c.el.getBoundingClientRect(); c.top = r.top + y; c.h = r.height; c.lens = null;
+      var r = c.el.getBoundingClientRect(); c.top = r.top + y; c.h = r.height; c.lens = c.band = null;
       c.a = i ? c.top - X : -Infinity;
     });
     var pr = paper.getBoundingClientRect(), hr = hero.getBoundingClientRect();
@@ -112,10 +117,12 @@
     return Math.ceil(c.top + 2);
   }
   /* the backgrounds: chapter i's look is whole from the top of its section down and comes up the screen with it, mixed
-     into the last one's over a soft band above that edge. LaLa-World's starts where the opening screen ends: the poster
-     has a moment to itself before the title arrives */
+     into the last one's over a soft band above that edge. Between the opening screen and LaLa-World the poster has a
+     moment to itself: it comes out of b as the opening scrolls away, clearest before LaLa-World's title comes up, and goes
+     back into b as LaLa-World's model arrives (the film's move from 0 to 1, run by the scroll) */
   var SOFT = 0.3;   // the soft band, in screens
-  function edgeOf(i) { return i === 1 ? heroBottom + SOFT * H : chapters[i].top; }
+  function edgeOf(i) { return chapters[i].top; }
+  function passAt(y) { var a = heroBottom - 0.9 * H, b = chapters[1].a; return clamp01((y - a) / Math.max(1, b - a)); }
   function lookAt(y) {   // { a: look above, b: look below the edge, at: the edge (screens from the top) }
     for (var i = LAST; i >= 1; i--) {
       var at = (edgeOf(i) - y) / H;
@@ -124,6 +131,8 @@
     return { a: chapters[0].look };
   }
   function showLook(y) {
+    var u = passAt(y);
+    if (u > 0 && u < 1) { film.pass(u); film.setNight(false); return; }
     var lk = lookAt(y);
     if (lk.b) film.split(lk.a, lk.b, lk.at, SOFT); else film.look(lk.a);
     film.setNight(film.isNight(lk.b && lk.at < 50 / H ? lk.b : lk.a));   // the page's colours: those of the look under the nav
@@ -148,7 +157,7 @@
   }
 
   /* ---------------------------------------------------------------- the film */
-  var film = null, current = -1, pending = -1, pendingTimer = 0, queued = -1, interacted = false, endTimer = 0;
+  var film = null, current = -1, pending = -1, pendingTimer = 0, queued = -1, endTimer = 0;
   var vis = 0;   // how much of the current chapter's model shows
   var stageEl = $('#stage');
 
@@ -164,22 +173,29 @@
     var top = r.top + y, bottom = r.bottom + y, pad = Math.min(26, (bottom - top) * 0.05);
     return film.fitShot(0, toNDC({ left: r.left + 8, right: r.right - 8, top: top + pad, bottom: bottom - pad }), 2.2);
   }
-  /* the chapters keep the film's framing on wide screens (a little smaller and higher over a row of controls); on narrow
-     ones each shot's box is fitted between its title and the bottom of its pin */
-  var LENS = { world: { s: 1, x: 0, y: 0 }, latent: { s: 0.93, x: 0, y: 0.07 }, words: { s: 1, x: 0, y: 0 }, legacy: { s: 1, x: 0, y: 0 },
-    data1: { s: 0.94, x: 0, y: 0.05 }, data2: { s: 0.8, x: 0, y: 0.13 }, evolve: { s: 0.94, x: 0, y: 0.05 }, policy: { s: 0.95, x: 0, y: 0.06 },
-    end: { s: 1, x: 0, y: 0 } };
-  function bandOf(c) {   // the free band of a pinned chapter: under its title, over its controls
-    var p = c.pinEl.getBoundingClientRect(), t = c.cap.getBoundingClientRect(), k = c.ctl && c.ctl.getBoundingClientRect();
-    return { top: t.bottom - p.top, bottom: k && k.height ? k.top - p.top : p.height - Math.max(0.044 * vh, 22) };
+  /* a chapter's frame (its pin) is four fifths of the screen, so on every screen each shot's box is fitted
+     between its title and the foot of the frame (on a wide one never larger than the film shows it). The charts' shots
+     show nothing of the stage: the chart is laid out in the pin itself (lala-charts.js) */
+  function bandOf(c) {   // the free band of a pinned chapter, under its title (px from the top of its pin)
+    if (!c.band) {
+      var p = c.pinEl.getBoundingClientRect(), t = c.cap.getBoundingClientRect();
+      c.band = { top: t.bottom - p.top, bottom: p.height - Math.max(0.03 * vh, 16), h: p.height };
+    }
+    return c.band;
   }
   function lensOf(c) {
-    if (!narrow() || !c.pinEl) return LENS[c.key] || LENS.world;
+    if (!c.pinEl) return { s: 1, x: 0, y: 0 };
     if (!c.lens) {
-      var b = bandOf(c), S = film.stage.size;
-      c.lens = film.fitShot(film.byShot[c.key], toNDC({ left: 12, right: S.w - 12, top: b.top + 12, bottom: b.bottom - 10 }), 3);
+      var b = bandOf(c), S = film.stage.size, m = narrow() ? 12 : 0.06 * S.w;
+      c.lens = film.fitShot(film.byShot[c.key], toNDC({ left: m, right: S.w - m, top: b.top + 12, bottom: b.bottom - 10 }), narrow() ? 3 : 1);
     }
     return c.lens;
+  }
+  /* the picture keeps to its frame: it fades out softly toward the frame's edges, so nothing of it reaches the next
+     chapter coming up below (or the last one above) */
+  function maskFor(c, y) {
+    var S = film.stage.size, t = off(c, y), soft = Math.max(16, 0.04 * vh);
+    return { x0: -soft, x1: S.w + soft, y0: t + soft, y1: t + H - soft, soft: soft };
   }
   function onFrame(dt) {
     var y = window.scrollY, L = film.stage.lens, c = chapters[current], S = film.stage.size;
@@ -195,7 +211,13 @@
        queued shot waits until the last model has gone */
     var aim = queued < 0 && shows(current, y) ? 1 : 0;
     vis = aim > vis ? Math.min(1, vis + dt / 0.5) : Math.max(0, vis - dt / (queued < 0 ? 0.3 : 0.12));
-    film.setFade(vis * vis * (3 - 2 * vis));
+    var fv = vis * vis * (3 - 2 * vis);
+    if (CHART[c.key] && c.pinEl) {   // a chart stands in its pin, from the foot of the title down, and comes and goes like a model
+      var b = bandOf(c);              // (the stage is empty under it: a phone's tall view would catch the top of the model)
+      film.placeChart({ top: off(c, y), h: b.h, capBottom: b.top, bottom: b.bottom, alpha: fv });
+      film.setFade(0);
+    } else { film.placeChart(null); film.setFade(fv); }
+    film.setMask(current > 0 && c.pinEl ? maskFor(c, y) : null);
     if (queued >= 0 && vis === 0) { var q = queued; queued = -1; start(q); }
     syncHint();
     var shot = film.shots[film.byShot[c.key]];
@@ -218,8 +240,6 @@
     clearTimeout(endTimer);
     film.setPaused(false);
     if (c.key === 'end') endTimer = setTimeout(function () { if (chapters[current].key === 'end') film.setPaused(true); }, 1600);   // a still sky: stop drawing
-    if (i >= byKey.data1.i - 1) loadVideo();
-    if (c.key === 'policy') syncPolicy();
     syncChrome();
   }
   function want(i) {   // the shot changes a moment after the scroll crosses into a chapter: a fling through five plays only the last
@@ -230,15 +250,26 @@
     pendingTimer = setTimeout(function () { play(i); }, 120);
   }
 
+  /* how far the scroll is through chapter i (0 → 1): from where it takes over to where the next one does (the last: the
+     foot of the page) */
+  function stretch(i, y) {
+    var a = i ? chapters[i].a : 0, b = i < LAST ? chapters[i + 1].a : document.documentElement.scrollHeight - vh;
+    return clamp01((y - a) / Math.max(1, b - a));
+  }
+  /* the dots: the chapters passed stay darker, the current one is a bar that fills as the visitor scrolls through it */
   function syncChrome() {
     var y = window.scrollY, a = activeAt(y), past = y > paperBottom - 40;
     nav.classList.toggle('on', past);
     dotsNav.classList.toggle('on', past);
-    dots.forEach(function (d, j) { d.classList.toggle('on', j === a); if (j === a) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current'); });
+    dots.forEach(function (d, j) {
+      d.classList.toggle('on', j === a); d.classList.toggle('done', j < a);
+      if (j === a) { d.setAttribute('aria-current', 'step'); d.style.setProperty('--p', stretch(a, y).toFixed(3)); }
+      else d.removeAttribute('aria-current');
+    });
   }
   var hintOn = false;
-  function syncHint() {   // "drag to rotate", while one of the first models is on the screen and nobody has dragged yet
-    var on = !!film && !interacted && current >= 0 && current < byKey.data1.i && vis > 0.6;
+  function syncHint() {   // "drag to rotate", in the corner throughout the chapters with a model to turn (not a chart's, not the credits)
+    var k = current >= 0 ? chapters[current].key : '', on = !!film && !!k && !CHART[k] && k !== 'end';
     if (on !== hintOn) { hintOn = on; hint.classList.toggle('on', on); }
   }
 
@@ -269,36 +300,16 @@
   measure();
   syncChrome();
 
-  /* the controls of two chapters: the domain the world model plays; LaLa-World or LaLa-Policy */
-  var domainRow = $('.ctl[data-for="latent"]'), policyRow = $('.ctl[data-for="policy"]');
-  function buildDomains() {
-    domainRow.innerHTML = film.domains.map(function (d, i) {
-      return '<button type="button" data-domain="' + i + '" aria-pressed="false">' + d.name + '</button>';
-    }).join('');
-    domainRow.addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (b && chapters[current].key === 'latent') film.playDomain(+b.getAttribute('data-domain'));
+  /* the files that come after the model: the robot demonstrations and the OpenVid clips, both in the opening's data.
+     They load as soon as the model stands; each card drops in when its file has arrived */
+  var later = false;
+  function loadLater() {
+    if (later || !film) return;
+    later = true;
+    [['assets/robot.js', 'addRobots', 'robot demonstrations'], ['assets/media-video.js', 'addVideo', 'video cards']].forEach(function (f) {
+      loadScript(f[0]).then(function () { return film[f[1]](); })
+        .catch(function (e) { console.warn('LaLa-World: ' + f[2] + ' unavailable', e); });
     });
-  }
-  function onDomain(i) {
-    $$('button', domainRow).forEach(function (b, j) { b.classList.toggle('on', j === i); b.setAttribute('aria-pressed', j === i ? 'true' : 'false'); });
-  }
-  function syncPolicy() {
-    if (!film) return;
-    $$('button', policyRow).forEach(function (b) {
-      var on = (b.getAttribute('data-model') === 'policy') === film.policy;
-      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-  }
-  policyRow.addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b || !film || chapters[current].key !== 'policy') return;
-    film.setPolicy(b.getAttribute('data-model') === 'policy'); syncPolicy();
-  });
-
-  var videoLoad = null;
-  function loadVideo() {
-    if (videoLoad || !film) return;
-    videoLoad = loadScript('assets/media-video.js').then(function () { return film.addVideo(); })
-      .catch(function (e) { console.warn('LaLa-World: video cards unavailable', e); });
   }
 
   function fallback(err) {
@@ -307,23 +318,20 @@
     nav.classList.remove('on'); dotsNav.classList.remove('on');
   }
 
-  Promise.all([loadScript('assets/media.js'), loadScript('assets/lala-stage.js'), loadScript('assets/lala-world.js')]).then(function () {
+  Promise.all([loadScript('assets/media.js'), loadScript('assets/lala-stage.js'), loadScript('assets/lala-charts.js'), loadScript('assets/lala-world.js')]).then(function () {
     return window.LalaFilm.boot({
       host: stageEl, labelHost: document.body, view: viewFor, onFrame: function (dt) { if (film && current >= 0) onFrame(dt); },
-      onDomain: function (i) { onDomain(i); },
-      onInteract: function () { interacted = true; syncHint(); },
       onFirstFrames: function () { stageEl.classList.add('on'); root.classList.add('ready'); }
     });
   }).then(function (api) {
     film = api;
     window.__film = api;
     chapters.forEach(function (c) { c.look = film.lookName(film.byShot[c.key]); });
-    buildDomains();
     measure();
     var y = window.scrollY, a = activeAt(y);
     showLook(y);   // the first frame already wears its background
     if (a === 0) play(0); else play(a, true);   // the opening builds up layer by layer; deeper in, the shot is just there
-    if ('requestIdleCallback' in window) requestIdleCallback(loadVideo, { timeout: 6000 }); else setTimeout(loadVideo, 4000);
+    loadLater();
     if (location.hash && a === 0) {   // a link to a chapter
       var target = document.getElementById(location.hash.slice(1)), c = target && chapters.filter(function (ch) { return ch.el === target; })[0];
       if (c) { window.scrollTo(0, startOf(c.i)); onScroll(); }

@@ -91,50 +91,67 @@
       </header>
 
       <!-- One chapter per shot of the film. A chapter's .pin holds the screen while the section scrolls past (data-pin:
-           for how long, in vh): its title rises from below with the page, its shot plays, then both scroll away. -->
-      <section class="chapter dark" id="lala-world" data-shot="world" data-pin="50" aria-labelledby="h-world">
+           for how long, in vh): its title rises from below with the page, its shot plays, then both scroll away.
+           The results chapters (p1–p4) hold a chart instead of the model. A chapter's frame is four fifths of the screen
+           and holds briefly, so the top of the next one is already in view below it. -->
+      <section class="chapter" id="lala-world" data-shot="world" data-pin="20" aria-labelledby="h-world">
         <div class="pin">
           <h2 class="cap wm" id="h-world">LaLa-<em>World</em><small>Language-conditioned Latent World Model</small></h2>
         </div>
       </section>
-      <section class="chapter" id="latent" data-shot="latent" data-pin="70" aria-labelledby="h-latent">
+      <section class="chapter" id="latent" data-shot="latent" data-pin="20" aria-labelledby="h-latent">
         <div class="pin">
           <h2 class="cap" id="h-latent">Predicts <em>the future</em>.<br><span class="mute">In latent space.</span></h2>
-          <div class="row ctl" data-for="latent" role="group" aria-label="Show a domain"></div>
         </div>
       </section>
-      <section class="chapter" id="actions" data-shot="words" data-pin="80" aria-labelledby="h-words">
+      <section class="chapter" id="actions" data-shot="words" data-pin="30" aria-labelledby="h-words">
         <div class="pin">
           <h2 class="cap" id="h-words">Every action, <em>in words</em>.</h2>
         </div>
       </section>
-      <section class="chapter" id="one-model" data-shot="legacy" data-pin="90" aria-labelledby="h-legacy">
+      <section class="chapter" id="one-model" data-shot="legacy" data-pin="30" aria-labelledby="h-legacy">
         <div class="pin">
           <h2 class="cap" id="h-legacy">No more <em>domain-specific</em> models.</h2>
         </div>
       </section>
-      <section class="chapter" id="domains" data-shot="data1" data-pin="50" aria-labelledby="h-data1">
+      <section class="chapter" id="domains" data-shot="data1" data-pin="20" aria-labelledby="h-data1">
         <div class="pin">
           <h2 class="cap" id="h-data1">One world model. <em class="nw">Every domain.</em></h2>
         </div>
       </section>
-      <section class="chapter" id="video" data-shot="data2" data-pin="60" aria-labelledby="h-data2">
+      <section class="chapter" id="video" data-shot="data2" data-pin="20" aria-labelledby="h-data2">
         <div class="pin">
           <h2 class="cap" id="h-data2">Learns from <em>video</em>, too.</h2>
         </div>
       </section>
-      <section class="chapter dark" id="evolve" data-shot="evolve" data-pin="100" aria-labelledby="h-evolve">
+      <section class="chapter" id="planning" data-shot="p1" data-pin="20" aria-labelledby="h-p1">
+        <div class="pin">
+          <h2 class="cap" id="h-p1">Plans <em>better</em>.<br><span class="mute">Than other latent world models.</span></h2>
+        </div>
+      </section>
+      <section class="chapter" id="planning-time" data-shot="p2" data-pin="20" aria-labelledby="h-p2">
+        <div class="pin">
+          <h2 class="cap" id="h-p2"><em>13.9×</em> faster planning.<br><span class="mute">Than a video generation model.</span></h2>
+        </div>
+      </section>
+      <section class="chapter" id="training-cost" data-shot="p3" data-pin="20" aria-labelledby="h-p3">
+        <div class="pin">
+          <h2 class="cap" id="h-p3"><em>6×</em> less training cost.<br><span class="mute">Than a video generation model.</span></h2>
+        </div>
+      </section>
+      <section class="chapter dark" id="evolve" data-shot="evolve" data-pin="30" aria-labelledby="h-evolve">
         <div class="pin">
           <h2 class="cap" id="h-evolve">Evolves into <em>LaLa-Policy</em>.</h2>
         </div>
       </section>
-      <section class="chapter dark" id="lala-policy" data-shot="policy" data-pin="70" aria-labelledby="h-policy">
+      <section class="chapter dark" id="lala-policy" data-shot="policy" data-pin="20" aria-labelledby="h-policy">
         <div class="pin">
           <h2 class="cap wm" id="h-policy">LaLa-<em>Policy</em><small>Acts — and anticipates.</small></h2>
-          <div class="row ctl" data-for="policy" role="group" aria-label="Show a model">
-            <button type="button" data-model="world">LaLa-World</button>
-            <button type="button" data-model="policy">LaLa-Policy</button>
-          </div>
+        </div>
+      </section>
+      <section class="chapter dark" id="policy-results" data-shot="p4" data-pin="20" aria-labelledby="h-p4">
+        <div class="pin">
+          <h2 class="cap" id="h-p4">More capable. Up to <em>5.5×</em> faster.</h2>
         </div>
       </section>
 

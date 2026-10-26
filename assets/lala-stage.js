@@ -1,4 +1,4 @@
-/* LaLa-World project page — the 3D stage (from the LaLa 3D film, claude-3d-model_v6/assets/lala-stage.js).
+/* LaLa-World project page — the 3D stage (from the LaLa 3D film, claude-3d-model_v14/assets/lala-stage.js).
    Classic script so the page also works when opened from file:// (local ES modules would be blocked).
    lala-world.js loads three.js from the CDN and calls
      LalaStage.create({ THREE, OrbitControls, EffectComposer, RenderPass, UnrealBloomPass, OutputPass, ShaderPass }, config)
@@ -14,12 +14,19 @@
      - the titles are the page's (config.caption, if given, still hears goShot's captionAt), and with config.pageBg
        the page owns the background too.
 
-   Background: one full-screen shader layer mixes the studio sweep, the night sky of the talk's section slides and the
-   LaLa-World poster. stage.bg.to({...}, seconds) eases its parameters, so a shot can dissolve one into another:
-     night  0 studio … 1 night sky        amt   poster opacity          lift  poster pulled toward white   sat  its saturation
-     band   0 full frame … 1 lower band   blur  0 sharp … 1 blurred   zoom/panU/panV  poster framing (cover fit × zoom;
-                                                                     zoom < 1: its blurred edges run on into the base)
-     glow   bloom strength (0 studio … 1 night)
+   Background: one full-screen shader mixes, bottom to top, the studio sweep or the night sky of the talk's section
+   slides, the poster's veil (b) and the LaLa-World poster itself (a). stage.bg.to({...}, seconds) sets (or eases) the
+   parameters of a look:
+     night  0 studio … 1 night sky        veil  b's opacity (the poster blurred and pulled 84 % toward white, cover fit)
+     amt    a's opacity                   lift  a pulled toward white     sat  its saturation    blur  0 sharp … 1 blurred
+     bright a's shadows lifted along 1 - (1 - c)^(1 + bright): lighter without turning grey
+     zoom/panU/panV  a's framing: as on a 16:9 screen × zoom (a wider screen keeps its height, so the people keep their
+                     size; a narrow one sees it at its full height); cropL: a starts this far in from its left edge (the
+                     poster's dark margin)
+     sides  1: a softens to its colours toward its sides and runs on past them, so it always fills the screen
+     cool   0: a is lifted toward white … 1: toward a cool lavender white
+     band/bandLo/bandHi  1: a is pulled further toward white from screen height bandLo to bandHi (light behind the caption)
+     top    the night sky darker toward the top        glow   bloom strength (0 studio … 1 night)
    The light rig follows `night` (it swaps at the halfway point). */
 (function () {
   'use strict';
@@ -215,34 +222,46 @@
     /* the background at a screen position: the layer under the scene, and what the fade below mixes toward. Two looks can
        share the screen: the second one from an edge up the screen down (the page's next section scrolling in), whole below
        the edge, mixed over a soft band above it */
-    var LOOK_U = ['Night', 'Amt', 'Lift', 'Band', 'Blur', 'Top', 'Sat', 'PUV', 'Feather'];
+    var LOOK_U = [['Night', 'float'], ['Veil', 'float'], ['VUV', 'vec4'], ['Amt', 'float'], ['Lift', 'float'], ['Bright', 'float'], ['Band', 'float'],
+      ['BandY', 'vec2'], ['Blur', 'float'], ['Sat', 'float'], ['PUV', 'vec4'], ['Top', 'float'], ['Sides', 'float'], ['CropL', 'float'], ['Cool', 'float']];
+    function lookArgs(k) { return LOOK_U.map(function (u) { return 'u' + u[0] + k; }).join(', '); }
     var BG_GLSL = [
       'uniform sampler2D tStudio; uniform sampler2D tNight; uniform sampler2D tPoster; uniform sampler2D tPosterBlur; uniform vec2 uEdge;',
-      LOOK_U.map(function (n) { return 'uniform ' + (n === 'PUV' ? 'vec4' : 'float') + ' u' + n + '; uniform ' + (n === 'PUV' ? 'vec4' : 'float') + ' u' + n + '2;'; }).join(' '),
-      'vec3 lalaLook(vec2 vUv, float night, float amt, float lift, float band, float blur, float top, float sat, vec4 puv, float feather){',
+      LOOK_U.map(function (u) { return 'uniform ' + u[1] + ' u' + u[0] + '; uniform ' + u[1] + ' u' + u[0] + '2;'; }).join(' '),
+      'const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);',
+      'vec3 lalaLook(vec2 vUv, ' + LOOK_U.map(function (u) { return u[1] + ' ' + u[0].toLowerCase(); }).join(', ') + '){',
       '  vec3 base = mix(texture2D(tStudio, vUv).rgb, texture2D(tNight, vUv).rgb, night);',
-      '  vec2 p = vUv * puv.xy + puv.zw;',
-      '  float side = max(-p.x, p.x - 1.0);',   // > 0 beyond the poster's sides (zoomed out)
-      '  float soft = feather > 0.0 ? max(blur, smoothstep(-feather, 0.0, side)) : blur;',
-      '  vec3 post = mix(texture2D(tPoster, p).rgb, texture2D(tPosterBlur, p).rgb, soft);',
-      '  post = mix(vec3(dot(post, vec3(0.2126, 0.7152, 0.0722))), post, sat);',
-      '  post = mix(post, vec3(1.0), lift);',
-      '  float a = amt * mix(1.0, 1.0 - smoothstep(0.04, 0.46, vUv.y), band);',
-      '  a *= step(0.0, p.y) * step(p.y, 1.0);',
-      '  if (feather > 0.0) a *= 1.0 - smoothstep(0.0, 2.2 * feather, side);',   // zoomed out: the blurred edge runs on, then fades
-      '  vec3 col = mix(base, post, a);',
+      '  vec2 pv = vUv * vuv.xy + vuv.zw;',   // b: the poster blurred and pulled toward white, cover fit
+      '  vec3 vl = texture2D(tPosterBlur, pv).rgb;',
+      '  vl = mix(mix(vec3(dot(vl, LUMA)), vl, 1.3), vec3(1.0), 0.84);',
+      '  vec3 col = mix(base, vl, veil * step(0.0, pv.y) * step(pv.y, 1.0));',
+      '  vec2 p = vUv * puv.xy + puv.zw;',     // a: the poster itself (from cropL across), over b
+      '  float side = sides * smoothstep(-0.06, 0.0, max(-p.x, p.x - 1.0));',   // toward its sides, and past them, only its colours
+      '  vec2 pt = vec2(cropl + clamp(p.x, 0.0, 1.0) * (1.0 - cropl), p.y);',
+      '  vec3 post = mix(texture2D(tPoster, pt).rgb, texture2D(tPosterBlur, pt).rgb, max(blur, side));',
+      '  post = mix(post, texture2D(tPosterBlur, pt, 4.0).rgb, side);',
+      '  post = clamp(mix(vec3(dot(post, LUMA)), post, sat), 0.0, 1.0);',
+      '  post = 1.0 - pow(1.0 - post, vec3(1.0 + bright));',   // bright: the shadows lighter, keeping their colour
+      '  vec3 pale = mix(vec3(1.0), vec3(0.925, 0.91, 0.98), cool);',   // what it is lifted toward: white, or a cool lavender white
+      '  post = mix(post, pale, lift + (1.0 - lift) * 0.75 * band * smoothstep(bandy.x, bandy.y, vUv.y));',   // band: lighter toward the top
+      '  float a = amt * step(0.0, p.y) * step(p.y, 1.0) * max(step(0.0, p.x) * step(p.x, 1.0), step(0.001, sides));',
+      '  col = mix(col, post, a);',
       '  return col * (1.0 - top * (0.55 * smoothstep(0.55, 1.0, vUv.y)));',   // darker sky behind the title
       '}',
       'vec3 lalaBackground(vec2 vUv){',
       '  float k = uEdge.x < -1.0 ? 0.0 : 1.0 - smoothstep(uEdge.x, uEdge.x + uEdge.y, vUv.y);',   // 1 below the edge
-      '  vec3 c1 = k < 1.0 ? lalaLook(vUv, uNight, uAmt, uLift, uBand, uBlur, uTop, uSat, uPUV, uFeather) : vec3(0.0);',
+      '  vec3 c1 = k < 1.0 ? lalaLook(vUv, ' + lookArgs('') + ') : vec3(0.0);',
       '  if (k <= 0.0) return c1;',
-      '  vec3 c2 = lalaLook(vUv, uNight2, uAmt2, uLift2, uBand2, uBlur2, uTop2, uSat2, uPUV2, uFeather2);',
+      '  vec3 c2 = lalaLook(vUv, ' + lookArgs('2') + ');',
       '  if (k >= 1.0) return c2;',
       '  return pow(mix(pow(c1, vec3(0.4545)), pow(c2, vec3(0.4545)), k), vec3(2.2));',   // mixed as the eye sees it, not in linear light
       '}'].join('\n');
     var bgUniforms = { tStudio: { value: studioTex }, tNight: { value: nightTex }, tPoster: { value: blank }, tPosterBlur: { value: blank }, uEdge: { value: new THREE.Vector2(-2, 0.3) } };
-    LOOK_U.forEach(function (n) { ['', '2'].forEach(function (k) { bgUniforms['u' + n + k] = { value: n === 'PUV' ? new THREE.Vector4(1, 1, 0, 0) : n === 'Sat' ? 1 : 0 }; }); });
+    LOOK_U.forEach(function (u) {
+      ['', '2'].forEach(function (k) {
+        bgUniforms['u' + u[0] + k] = { value: u[1] === 'vec4' ? new THREE.Vector4(1, 1, 0, 0) : u[1] === 'vec2' ? new THREE.Vector2(0.5, 0.95) : u[0] === 'Sat' ? 1 : 0 };
+      });
+    });
     var bgMat = new THREE.ShaderMaterial({
       depthTest: false, depthWrite: false, toneMapped: false, uniforms: bgUniforms,
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -252,19 +271,24 @@
     bgQuad.frustumCulled = false; bgQuad.renderOrder = -1e9; scene.add(bgQuad);
     scene.background = null;
     /* the fade: the whole picture but the background, mixed toward the background (before the bloom, so the glow goes too).
-       The page fades a chapter's model in and out with the scroll; 1 = no pass at all */
+       The page fades a chapter's model in and out with the scroll; 1 = no pass at all. With `mask` on, the picture shows
+       only inside a rectangle (canvas px), softly over `soft` px around it: the page keeps the model to its chapter's frame */
     var fadeMat = new THREE.ShaderMaterial({
-      uniforms: Object.assign({ tDiffuse: { value: null }, uFade: { value: 1 } }, bgUniforms),   // the background's own uniforms, shared
+      uniforms: Object.assign({ tDiffuse: { value: null }, uFade: { value: 1 }, uMask: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uMaskSoft: { value: new THREE.Vector2(0.02, 0.02) }, uMaskOn: { value: 0 } }, bgUniforms),   // the background's own uniforms, shared
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: BG_GLSL + '\nuniform sampler2D tDiffuse; uniform float uFade; varying vec2 vUv;' +
-        'void main(){ vec4 c = texture2D(tDiffuse, vUv); gl_FragColor = vec4(mix(lalaBackground(vUv), c.rgb, uFade), c.a); }'
+      fragmentShader: BG_GLSL + '\nuniform sampler2D tDiffuse; uniform float uFade; uniform vec4 uMask; uniform vec2 uMaskSoft; uniform float uMaskOn; varying vec2 vUv;' +
+        'void main(){ vec4 c = texture2D(tDiffuse, vUv); float m = 1.0;' +
+        ' if (uMaskOn > 0.5) m = smoothstep(uMask.x - uMaskSoft.x, uMask.x, vUv.x) * (1.0 - smoothstep(uMask.z, uMask.z + uMaskSoft.x, vUv.x))' +
+        '   * smoothstep(uMask.y - uMaskSoft.y, uMask.y, vUv.y) * (1.0 - smoothstep(uMask.w, uMask.w + uMaskSoft.y, vUv.y));' +
+        ' gl_FragColor = vec4(mix(lalaBackground(vUv), c.rgb, uFade * m), c.a); }'
     });
     var fadePass = new lib.ShaderPass(fadeMat);
     fadePass.enabled = false;
     composer.insertPass(fadePass, 1);   // after the render, before the bloom
-    var fade = { v: 1 };
+    var fade = { v: 1 }, mask = { on: false, x0: 0, y0: 0, x1: 0, y1: 0, soft: 24 };
 
-    var BG = { night: 0, glow: 0, amt: 0, lift: 0, band: 0, blur: 0, sat: 1, zoom: 1, panU: 0.5, panV: 0, top: 0 };
+    var BG = { night: 0, glow: 0, veil: 0, amt: 0, lift: 0, bright: 0, band: 0, bandLo: 0.5, bandHi: 0.95, blur: 0, sat: 1, zoom: 1, panU: 0.5, panV: 0, top: 0, sides: 0, cropL: 0, cool: 0 };
     var BG2 = Object.assign({}, BG), EDGE = { at: 9, soft: 0.3 };   // at: where the second look is whole (screens from the top)
     var posterAspect = 1;
     var bg = {
@@ -294,14 +318,17 @@
       }
     };
     function setLook(L, k) {   // one look's uniforms (k: '' or '2')
-      var A = W / H, z = Math.max(0.5, L.zoom);
-      var sx = 1 / z, sy = posterAspect / (A * z);   // cover the screen width (the poster is taller than 16:9), then zoom
-      if (sy > 1) { sy = 1; sx = A / posterAspect / z * 1; }
-      var u = bgUniforms;
+      var A = W / H, z = Math.max(0.5, L.zoom), u = bgUniforms;
+      var vx = 1, vy = posterAspect / A;   // b: cover the screen width (the poster is taller than 16:9)
+      if (vy > 1) { vy = 1; vx = A / posterAspect; }
+      u['uVUV' + k].value.set(vx, vy, 0.5 * (1 - vx), 0);
+      /* a: framed as on a 16:9 screen, then zoomed; a wider screen keeps its height (the people keep their size) and sees more
+         across; a narrow one (a phone) sees it at the screen's full height, its sides cut */
+      var sy = Math.min(1, posterAspect / (Math.min(A, 16 / 9) * z)), sx = A * sy / (posterAspect * (1 - L.cropL));
       u['uPUV' + k].value.set(sx, sy, L.panU * (1 - sx), L.panV * (1 - sy));
-      u['uFeather' + k].value = sx > 1.001 ? Math.min(0.07, (sx - 1) * 0.6) : 0;   // narrower than the screen: soft sides
-      u['uNight' + k].value = L.night; u['uAmt' + k].value = L.amt; u['uLift' + k].value = L.lift; u['uBand' + k].value = L.band;
-      u['uBlur' + k].value = L.blur; u['uTop' + k].value = L.top; u['uSat' + k].value = L.sat;
+      u['uSides' + k].value = L.sides; u['uCropL' + k].value = L.cropL; u['uCool' + k].value = L.cool; u['uBandY' + k].value.set(L.bandLo, L.bandHi);
+      u['uNight' + k].value = L.night; u['uVeil' + k].value = L.veil; u['uAmt' + k].value = L.amt; u['uLift' + k].value = L.lift;
+      u['uBright' + k].value = L.bright; u['uBand' + k].value = L.band; u['uBlur' + k].value = L.blur; u['uTop' + k].value = L.top; u['uSat' + k].value = L.sat;
     }
     function applyBackground() {
       setLook(BG, '');
@@ -700,8 +727,9 @@
       if (config.onFrame) config.onFrame(dt);   // the page reads the scroll here: the picture moves in the same frame as the page
       syncCamera(dt);
       updateLabels();
-      var fv = clamp01(fade.v);
-      fadePass.enabled = fv < 0.999; fadeMat.uniforms.uFade.value = fv;
+      var fv = clamp01(fade.v), fu = fadeMat.uniforms;
+      fadePass.enabled = fv < 0.999 || mask.on; fu.uFade.value = fv; fu.uMaskOn.value = mask.on ? 1 : 0;
+      if (mask.on) { fu.uMask.value.set(mask.x0 / W, 1 - mask.y1 / H, mask.x1 / W, 1 - mask.y0 / H); fu.uMaskSoft.value.set(mask.soft / W, mask.soft / H); }
       var lo = fv < 0.999 ? fv.toFixed(3) : '';
       if (labLayer.style.opacity !== lo) labLayer.style.opacity = lo;   // the labels go with the model
       composer.render();
@@ -718,7 +746,7 @@
       get mode() { return mode; }, get night() { return bg.light != null ? bg.light : BG.night; }, setMode: setMode, onMode: function (fn) { modeHandlers.push(fn); },
       bg: bg, onUpdate: onUpdate, anim: anim, wait: wait, cancel: cancel, flyTo: flyTo, drift: drift,
       labels: labelApi, goShot: goShot, get shotIndex() { return shotIndex; },
-      orbit: orbit, lens: lens, fade: fade, projectBox: projectBox, effFov: effFov,
+      orbit: orbit, lens: lens, fade: fade, mask: mask, projectBox: projectBox, effFov: effFov,
       get size() { return { w: W, h: H }; }, onResize: function (fn) { resizeHandlers.push(fn); },
       get interacting() { return interacting; },
       tex: { canvas: canvas, texture: texture, rrect: rrect, wrap: wrap, font: font, cover: cover },
